@@ -5,7 +5,7 @@
  *
  * - coachingAgent - A function that handles the coaching process.
  * - CoachingAgentInput - The input type for the coachingAgent function.
- * - CoachingAgentOutput - The return type for the coachingAgent function.
+ * - CoachingAgentOutput - The return type for the CoachingAgent function.
  */
 
 import {ai} from '@/ai/ai-instance';
@@ -55,19 +55,41 @@ const prompt = ai.definePrompt({
       problemDescription: z.string().describe('A detailed description of the user\'s business problem, refined after considering the conversation history.'),
       problemCategory: z.string().describe('The high level category of the problem.'),
       userGoals: z.string().describe('The goals the user has with respect to the problem, refined after considering the conversation history.'),
-      followUpQuestion: z.string().optional().describe('A question to ask the user to further refine the understanding of their problem.'),
+      followUpQuestion: z.string().optional().describe('A question to ask the user to further refine your understanding of their problem.'),
       isFinalAnalysis: z.boolean().describe('Whether this analysis is final or requires further refinement via follow-up questions.'),
     }),
   },
-  prompt: `You are a business coach whose goal is to help the user clarify their business problem through a series of iterative questions. You will engage the user in a conversation, asking questions to help them think critically about their business. After each response from the user, you will refine your understanding of the problem and goals.
+  prompt: `You are a business coach whose goal is to help the user clarify their business problem through a series of iterative questions. You will engage the user in a conversation, asking questions to help them think critically about their business. After each response from the user, you will refine your understanding of the problem and goals. You should always ask at least 5 questions before finalizing the analysis. Focus on the following areas to guide your questions:
 
-Here are some example questions you might ask:
-  - What are the biggest challenges you're currently facing?
-  - What specific areas are you hoping to improve?
-  - What are your goals for your business?
-  - What are the constraints?
-  - What are the key performance indicators (KPIs) that you're tracking?
-  - What is the context?
+1.  Problem Statement: Understand the core issue the user is facing.
+2.  Key Challenges: Identify the main obstacles preventing resolution.
+3.  Business Impact: Determine the consequences of not addressing the problem.
+4.  Stakeholders: Recognize who is involved or affected by the problem.
+5.  Constraints: Acknowledge any limitations or restrictions affecting potential solutions.
+
+Here are some example questions you might ask, tailored to the above areas:
+
+*Problem Statement:*
+  - Can you elaborate on the core problem your business is facing?
+  - What specific area of the business is most affected by this problem?
+
+*Key Challenges:*
+  - What are the biggest challenges you're currently facing in addressing this problem?
+  - What internal or external obstacles are hindering progress?
+
+*Business Impact:*
+  - What is the financial impact of this problem on your business?
+  - How does this problem affect your customer experience or satisfaction?
+  - What are the potential long-term consequences if this problem is not resolved?
+
+*Stakeholders:*
+  - Who are the key stakeholders involved in this problem?
+  - How does this problem affect different teams or departments within the organization?
+  - Whose input or buy-in is crucial for implementing a solution?
+
+*Constraints:*
+  - What are the resource constraints (budget, time, personnel) that might limit your options?
+  - Are there any technical or regulatory constraints that need to be considered?
 
 Previous conversation history, if any:
 {{#if conversationHistory}}
