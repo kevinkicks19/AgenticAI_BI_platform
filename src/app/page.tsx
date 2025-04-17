@@ -18,6 +18,7 @@ import {Button} from '@/components/ui/button';
 import {useState} from 'react';
 import {coachingAgent, CoachingAgentOutput} from '@/ai/flows/coaching-agent-flow';
 import {Textarea} from '@/components/ui/textarea';
+import {cn} from '@/lib/utils';
 
 export default function Home() {
   const [messages, setMessages] = useState<
@@ -27,23 +28,44 @@ export default function Home() {
   const [problemAnalysis, setProblemAnalysis] = useState<
     CoachingAgentOutput | null
   >(null);
+  const [conversationHistory, setConversationHistory] = useState<
+    {role: 'user' | 'agent'; content: string}[]
+  >([]);
+  const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
+  const [isFinalAnalysis, setIsFinalAnalysis] = useState(false);
 
   const handleSendMessage = async () => {
     if (!input.trim()) return;
 
     const userMessage = {text: input, type: 'user'} as const;
     setMessages(prev => [...prev, userMessage]);
+    setConversationHistory(prev => [...prev, {role: 'user', content: input}]);
     setInput('');
 
     try {
-      const analysis = await coachingAgent({initialUserMessage: input});
+      const analysis = await coachingAgent({
+        initialUserMessage: input,
+        conversationHistory: [...conversationHistory, {role: 'user', content: input}],
+        problemCategory: problemAnalysis?.problemCategory,
+        problemDescription: problemAnalysis?.problemDescription,
+        userGoals: problemAnalysis?.userGoals,
+      });
+
       setProblemAnalysis(analysis);
-      setMessages(prev => [
+      setFollowUpQuestion(analysis.followUpQuestion || null);
+      setIsFinalAnalysis(analysis.isFinalAnalysis);
+
+      const agentResponse = {
+        text: analysis.followUpQuestion
+          ? analysis.followUpQuestion
+          : `Problem Category: ${analysis.problemCategory}\nProblem Description: ${analysis.problemDescription}\nUser Goals: ${analysis.userGoals}`,
+        type: 'agent',
+      } as const;
+
+      setMessages(prev => [...prev, agentResponse]);
+      setConversationHistory(prev => [
         ...prev,
-        {
-          text: `Problem Category: ${analysis.problemCategory}\nProblem Description: ${analysis.problemDescription}\nUser Goals: ${analysis.userGoals}`,
-          type: 'agent',
-        },
+        {role: 'agent', content: agentResponse.text},
       ]);
     } catch (error) {
       console.error('Error during coaching agent execution:', error);
@@ -105,22 +127,30 @@ export default function Home() {
               {messages.map((message, index) => (
                 <div
                   key={index}
-                  className={`p-3 rounded-lg ${
+                  className={cn(
+                    'p-3 rounded-lg w-fit',
                     message.type === 'user'
-                      ? 'bg-blue-100 text-blue-800 ml-auto w-fit'
-                      : 'bg-gray-100 text-gray-800 mr-auto w-fit'
-                  }`}
+                      ? 'bg-blue-100 text-blue-800 ml-auto'
+                      : 'bg-gray-100 text-gray-800 mr-auto'
+                  )}
                 >
                   {message.text}
                 </div>
               ))}
+              {isFinalAnalysis && problemAnalysis ? (
+                <pre className="bg-green-100 p-4 rounded-md">
+                  <code>{JSON.stringify(problemAnalysis, null, 2)}</code>
+                </pre>
+              ) : null}
             </div>
           </div>
           <div className="p-4 flex space-x-2">
             <Textarea
               value={input}
               onChange={e => setInput(e.target.value)}
-              placeholder="Enter your business problem..."
+              placeholder={
+                followUpQuestion || 'Enter your business problem...'
+              }
               className="flex-1 rounded-md"
             />
             <Button onClick={handleSendMessage}>Send</Button>
