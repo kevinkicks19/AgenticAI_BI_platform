@@ -10,6 +10,7 @@
 
 import {ai} from '@/ai/ai-instance';
 import {z} from 'genkit';
+import {routeProblemInception} from '@/ai/flows/route-problem-inception';
 
 const CoachingAgentInputSchema = z.object({
   initialUserMessage: z.string().describe('The message from the user describing their business problem or their response to the coaching agent\'s questions.'),
@@ -28,9 +29,14 @@ const CoachingAgentOutputSchema = z.object({
   problemDescription: z.string().describe('A detailed description of the user\'s business problem, refined after considering the conversation history.'),
   problemCategory: z.string().describe('The high level category of the problem.'),
   userGoals: z.string().describe('The goals the user has with respect to the problem, refined after considering the conversation history.'),
-  followUpQuestion: z.string().optional().describe('A question to ask the user to further refine the understanding of their problem.'),
+  followUpQuestion: z.string().optional().describe('A question to ask the user to further refine your understanding of their problem.'),
   isFinalAnalysis: z.boolean().describe('Whether this analysis is final or requires further refinement via follow-up questions.'),
   numQuestionsAsked: z.number().describe('The number of questions the agent has asked so far.'),
+  conversationHistory: z.array(z.object({
+    role: z.enum(['user', 'agent']),
+    content: z.string(),
+  })).describe('The complete conversation history between the user and the coaching agent.'),
+  initialUserMessage: z.string().describe('The initial message from the user.'),
 });
 export type CoachingAgentOutput = z.infer<typeof CoachingAgentOutputSchema>;
 
@@ -134,8 +140,26 @@ const coachingAgentFlow = ai.defineFlow<
     ...input,
     numQuestionsAsked: input.numQuestionsAsked ? input.numQuestionsAsked : 0,
   });
-  return {
+
+  const numQuestionsAsked = (output!.numQuestionsAsked ? output!.numQuestionsAsked : 0) + 1;
+
+  const coachingAgentOutput = {
     ...output!,
-    numQuestionsAsked: (output!.numQuestionsAsked ? output!.numQuestionsAsked : 0) + 1,
+    numQuestionsAsked: numQuestionsAsked,
+    conversationHistory: input.conversationHistory ? input.conversationHistory : [],
+    initialUserMessage: input.initialUserMessage,
   };
+
+  if (coachingAgentOutput.isFinalAnalysis) {
+    // Call the routing agent to determine which agents should process the output.
+    await routeProblemInception({
+      problemCategory: coachingAgentOutput.problemCategory,
+      problemDescription: coachingAgentOutput.problemDescription,
+      userGoals: coachingAgentOutput.userGoals,
+      conversationHistory: coachingAgentOutput.conversationHistory,
+      initialUserMessage: coachingAgentOutput.initialUserMessage,
+    });
+  }
+
+  return coachingAgentOutput;
 });
