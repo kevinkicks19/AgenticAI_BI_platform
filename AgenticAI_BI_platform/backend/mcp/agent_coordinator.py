@@ -5,8 +5,8 @@ from langchain.schema import HumanMessage, AIMessage
 import openai
 from datetime import datetime
 import json
-from fastapi import APIRouter, Request, UploadFile, File, HTTPException
-import chromadb
+from fastapi import APIRouter, Request, UploadFile, File, HTTPException, Form
+import pinecone
 import aiofiles
 import os
 from pathlib import Path
@@ -16,9 +16,13 @@ import PyPDF2
 import docx
 import pandas as pd
 import io
-from config import OPENAI_API_KEY, REDIS_URL
+from config import OPENAI_API_KEY, REDIS_URL, PINECONE_API_KEY
 import re
 import traceback
+import asyncio
+from pinecone import Pinecone, ServerlessSpec
+import joblib
+import numpy as np
 
 class WorkflowContext(BaseModel):
     workflow_id: str
@@ -48,7 +52,7 @@ class DocumentProcessor:
     }
     
     @staticmethod
-    async def extract_text_from_file(file_content: bytes, mime_type: str) -> str:
+    def extract_text_from_file(file_content: bytes, mime_type: str) -> str:
         """Extract text content from various file formats."""
         if mime_type == 'text/plain':
             return file_content.decode('utf-8')
@@ -88,12 +92,28 @@ class AgentCoordinator:
             session_id="default"
         )
         self.sessions: Dict[str, AgentContext] = {}
-        # ChromaDB vector store for context
-        self.chroma_client = chromadb.Client()
-        self.vector_collection = self.chroma_client.create_collection("project_context")
+        # Pinecone v3+ vector store for context
+        self.pc = Pinecone(api_key=PINECONE_API_KEY)
+        # Optionally create the index if it doesn't exist
+        if "project-context" not in self.pc.list_indexes().names():
+            self.pc.create_index(
+                name="project-context",
+                dimension=1024,  # text-embedding-3-small produces 1024-dimensional vectors
+                metric="cosine",
+                spec=ServerlessSpec(cloud="aws", region="us-east-1")
+            )
+        self.index = self.pc.Index("project-context")
         self.document_processor = DocumentProcessor()
         # Instantiate the OpenAI client
         self.client = openai.OpenAI(api_key=openai_api_key)
+        self.pca = self._load_pca_model()
+
+    def _load_pca_model(self):
+        try:
+            return joblib.load("pca_1536_to_1024.joblib")
+        except Exception as e:
+            print("PCA model not found or failed to load. Using full embedding.", e)
+            return None
 
     async def initialize_session(self, user_id: str, project_context: Dict[str, Any]) -> str:
         session_id = f"{user_id}_{datetime.now().timestamp()}"
@@ -310,48 +330,78 @@ class AgentCoordinator:
         pass
 
     async def get_embedding(self, text: str) -> list:
-        """Get embedding vector for a given text using OpenAI's API."""
-        response = self.client.embeddings.create(
-            model="text-embedding-ada-002",
-            input=text
-        )
-        return response.data[0].embedding
+        try:
+            response = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: self.client.embeddings.create(
+                    model="text-embedding-3-small",  # This produces 1536-dimensional vectors
+                    input=text
+                )
+            )
+            embedding = response.data[0].embedding
+            if self.pca:
+                embedding_1024 = self.pca.transform(np.array(embedding).reshape(1, -1))[0]
+                return embedding_1024.tolist()
+            else:
+                return embedding
+        except Exception as e:
+            print(f"Error getting embedding: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error getting embeddings: {str(e)}"
+            )
 
     async def store_context_vector(self, session_id: str, text: str, metadata: dict = None):
         embedding = await self.get_embedding(text)
         doc_id = f"{session_id}_{datetime.now().timestamp()}"
-        self.vector_collection.add(
-            embeddings=[embedding],
-            metadatas=[metadata or {"session_id": session_id}],
-            ids=[doc_id],
-            documents=[text]
-        )
+        # Pinecone upsert
+        self.index.upsert([
+            (
+                doc_id,
+                embedding,
+                metadata or {"session_id": session_id}
+            )
+        ])
+        return doc_id
 
     async def query_context(self, query_text: str, top_k: int = 5):
         query_embedding = await self.get_embedding(query_text)
-        results = self.vector_collection.query(
-            query_embeddings=[query_embedding],
-            n_results=top_k
+        result = self.index.query(
+            vector=query_embedding,
+            top_k=top_k,
+            include_metadata=True
         )
         # Return the most relevant documents and their metadata
+        matches = result.get("matches", [])
+        documents = [m.get("id") for m in matches]
+        metadatas = [m.get("metadata") for m in matches]
+        ids = [m.get("id") for m in matches]
+        scores = [m.get("score") for m in matches]
         return {
-            "documents": results.get("documents", [[]])[0],
-            "metadatas": results.get("metadatas", [[]])[0],
-            "ids": results.get("ids", [[]])[0],
-            "distances": results.get("distances", [[]])[0],
+            "documents": documents,
+            "metadatas": metadatas,
+            "ids": ids,
+            "scores": scores,
         }
 
     async def process_document(self, session_id: str, file: UploadFile, metadata: Dict[str, Any] = None) -> Dict[str, Any]:
         """Process and store an uploaded document in the vector store."""
+        import traceback
+        start_time = datetime.now()
+        print(f"\nStarting document processing at {start_time}")
+        
         try:
             # Read file content
             content = await file.read()
+            print(f"File read complete. Size: {len(content)} bytes")
             
             # Detect file type
             mime_type = magic.from_buffer(content, mime=True)
+            print(f"File type detected: {mime_type}")
             
             # Validate file type
             if mime_type not in self.document_processor.ALLOWED_MIME_TYPES:
+                print(f"Unsupported file type: {mime_type}")
                 raise HTTPException(
                     status_code=400,
                     detail=f"Unsupported file type: {mime_type}. Allowed types: {', '.join(self.document_processor.ALLOWED_MIME_TYPES)}"
@@ -359,24 +409,58 @@ class AgentCoordinator:
             
             # Extract text content based on file type
             try:
-                text_content = await self.document_processor.extract_text_from_file(content, mime_type)
+                print("Extracting text from file...")
+                text_content = self.document_processor.extract_text_from_file(content, mime_type)
             except Exception as e:
+                tb = traceback.format_exc()
+                print(f"Error extracting text from file: {str(e)}\n{tb}")
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Error extracting text from file: {str(e)}"
+                    detail=f"Error extracting text from file: {str(e)}\n{tb}"
                 )
             
-            # Store the document in the vector store
+            print(f"Text extraction complete. Content length: {len(text_content)} characters")
+            
+            # Split text into chunks for better vector storage
+            chunks = self._split_text_into_chunks(text_content)
+            print(f"Text split into {len(chunks)} chunks")
+            
+            # Store each chunk in the vector store with metadata
             doc_metadata = {
                 "session_id": session_id,
                 "filename": file.filename,
                 "content_type": mime_type,
                 "upload_time": datetime.now().isoformat(),
                 "file_size": len(content),
+                "chunk_index": 0,  # Will be updated for each chunk
                 **(metadata or {})
             }
             
-            await self.store_context_vector(session_id, text_content, doc_metadata)
+            chunk_ids = []
+            for i, chunk in enumerate(chunks):
+                print(f"Processing chunk {i+1}/{len(chunks)}")
+                chunk_metadata = {**doc_metadata, "chunk_index": i}
+                try:
+                    embedding = await self.get_embedding(chunk)
+                    doc_id = f"{session_id}_{datetime.now().timestamp()}_{i}"
+                    await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: self.index.upsert([
+                            (
+                                doc_id,
+                                embedding,
+                                chunk_metadata
+                            )
+                        ])
+                    )
+                    chunk_ids.append(doc_id)
+                except Exception as e:
+                    tb = traceback.format_exc()
+                    print(f"Error storing chunk {i}: {str(e)}\n{tb}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Error storing chunk {i}: {str(e)}\n{tb}"
+                    )
             
             # Update session context
             context = await self._get_context(session_id)
@@ -386,27 +470,85 @@ class AgentCoordinator:
                 "filename": file.filename,
                 "upload_time": doc_metadata["upload_time"],
                 "content_type": mime_type,
-                "file_size": len(content)
+                "file_size": len(content),
+                "chunk_count": len(chunks),
+                "chunk_ids": chunk_ids
             })
             await self._store_context(context)
+            
+            end_time = datetime.now()
+            processing_time = (end_time - start_time).total_seconds()
+            print(f"\nDocument processing completed in {processing_time:.2f} seconds")
             
             return {
                 "status": "success",
                 "message": f"Document {file.filename} processed successfully",
-                "metadata": doc_metadata
+                "metadata": doc_metadata,
+                "chunk_count": len(chunks),
+                "processing_time_seconds": processing_time
             }
             
         except HTTPException as he:
-            raise he
+            tb = traceback.format_exc()
+            print(f"HTTP Exception during processing: {str(he)}\n{tb}")
+            raise HTTPException(
+                status_code=he.status_code,
+                detail=f"{he.detail}\n{tb}"
+            )
         except Exception as e:
+            tb = traceback.format_exc()
+            print(f"Unexpected error during processing: {str(e)}\n{tb}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Error processing document: {str(e)}"
+                detail=f"Error processing document: {str(e)}\n{tb}"
             )
+
+    def _split_text_into_chunks(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
+        """Split text into overlapping chunks for better vector storage."""
+        chunks = []
+        start = 0
+        text_length = len(text)
+        
+        while start < text_length:
+            end = start + chunk_size
+            if end > text_length:
+                end = text_length
+            
+            # Try to find a natural break point (newline or period)
+            if end < text_length:
+                # Look for the last newline in the chunk
+                last_newline = text.rfind('\n', start, end)
+                if last_newline != -1 and last_newline > start + chunk_size // 2:
+                    end = last_newline + 1
+                else:
+                    # Look for the last period followed by space
+                    last_period = text.rfind('. ', start, end)
+                    if last_period != -1 and last_period > start + chunk_size // 2:
+                        end = last_period + 2
+            
+            chunks.append(text[start:end].strip())
+            start = end - overlap
+        
+        return chunks
 
 # --- FastAPI Router for Coordinator APIs ---
 router = APIRouter()
 coordinator = AgentCoordinator(redis_url=REDIS_URL, openai_api_key=OPENAI_API_KEY)
+
+# New endpoint to update project context (for augmenting context as the project progresses)
+@router.post("/api/project/update_context")
+async def update_project_context(request: Request):
+    try:
+        data = await request.json()
+        session_id = data.get("session_id")
+        new_context = data.get("context")
+        if not session_id or not new_context:
+            raise HTTPException(status_code=400, detail="session_id and context are required")
+        await coordinator.store_context_vector(session_id, str(new_context))
+        return {"status": "context updated"}
+    except Exception as e:
+        print("Error updating project context:", e)
+        raise HTTPException(status_code=500, detail=f"Error updating project context: {str(e)}")
 
 @router.post("/api/chat")
 async def chat(request: Request):
@@ -514,24 +656,85 @@ async def suggestions(request: Request):
     return await coordinator.suggest_next_steps(session_id)
 
 @router.post("/api/documents/upload")
-async def upload_document(
+async def upload_documents(
     request: Request,
-    file: UploadFile = File(...),
+    file: UploadFile = File(None),  # Single file upload
+    files: List[UploadFile] = File(None),  # Multiple files upload
     session_id: str = None,
-    metadata: Dict[str, Any] = None
+    metadata: str = None
 ):
-    """Upload and process a document for the current session.
+    """Upload and process documents for the current session."""
+    import traceback
+    import json
+    print("\n=== Document Upload Request ===")
+    print(f"Session ID from query params: {request.query_params.get('session_id')}")
+    print(f"Session ID from parameter: {session_id}")
     
-    Supported file types:
-    - Text files (.txt)
-    - PDF documents (.pdf)
-    - Word documents (.docx)
-    - Excel spreadsheets (.xls, .xlsx)
-    - CSV files (.csv)
-    """
+    # Parse metadata if it's a string (from multipart/form-data)
+    if metadata:
+        try:
+            metadata = json.loads(metadata)
+        except Exception:
+            print("Warning: Could not parse metadata as JSON. Using empty dict.")
+            metadata = {}
+    else:
+        metadata = {}
+    
+    # Get session ID from query params if not provided
     if not session_id:
-        session_id = request.query_params.get("sessionId")
+        session_id = request.query_params.get("session_id")
     if not session_id:
+        print("Error: No session ID provided")
         raise HTTPException(status_code=400, detail="Session ID is required")
     
-    return await coordinator.process_document(session_id, file, metadata) 
+    print(f"Using session ID: {session_id}")
+    
+    # Handle both single file and multiple files
+    files_to_process = []
+    if file:
+        files_to_process = [file]
+    elif files:
+        files_to_process = files
+    else:
+        raise HTTPException(status_code=400, detail="No files provided")
+    
+    print(f"Number of files to process: {len(files_to_process)}")
+    for f in files_to_process:
+        print(f"File: {f.filename}, Content-Type: {f.content_type}")
+    
+    results = []
+    for f in files_to_process:
+        try:
+            print(f"\nProcessing file: {f.filename}")
+            result = await coordinator.process_document(session_id, f, metadata)
+            print(f"Successfully processed {f.filename}")
+            results.append(result)
+        except HTTPException as he:
+            tb = traceback.format_exc()
+            print(f"HTTP Exception processing file {f.filename}: {str(he)}\n{tb}")
+            results.append({
+                "status": "error",
+                "filename": f.filename,
+                "error": f"{he.detail}\n{tb}"
+            })
+        except Exception as e:
+            tb = traceback.format_exc()
+            print(f"Unexpected error processing file {f.filename}: {str(e)}\n{tb}")
+            results.append({
+                "status": "error",
+                "filename": f.filename,
+                "error": f"Unexpected error: {str(e)}\n{tb}"
+            })
+    
+    print("\n=== Upload Results ===")
+    print(json.dumps(results, indent=2))
+    print("=====================\n")
+    
+    # If it was a single file upload, return just that result
+    if file and not files:
+        return results[0]
+    
+    return {
+        "status": "success",
+        "documents": results
+    } 

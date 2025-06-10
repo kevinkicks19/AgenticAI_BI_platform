@@ -11,6 +11,11 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY environment variable is not set")
 
+# Pinecone Configuration
+PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
+if not PINECONE_API_KEY:
+    raise ValueError("PINECONE_API_KEY environment variable is not set")
+
 # Redis Configuration
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
 

@@ -24,6 +24,12 @@ interface Document {
   file_size: number;
 }
 
+interface ProjectContext {
+  name: string;
+  description: string;
+  documents: Document[];
+}
+
 const API_BASE_URL = 'http://localhost:8000';
 
 const ResponseButton: React.FC<ResponseButtonProps> = ({ onClick, label }) => (
@@ -48,6 +54,132 @@ const ResponseButton: React.FC<ResponseButtonProps> = ({ onClick, label }) => (
   </button>
 );
 
+const ProjectContextUpload: React.FC<{
+  onContextUpdate: (context: ProjectContext) => void;
+  documents: Document[];
+}> = ({ onContextUpdate, documents }) => {
+  const [projectName, setProjectName] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append('files', files[i]);
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/documents/upload`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) throw new Error('Failed to upload documents');
+      
+      const data = await response.json();
+      onContextUpdate({
+        name: projectName,
+        description: projectDescription,
+        documents: [...documents, ...data.documents]
+      });
+    } catch (error) {
+      console.error('Error uploading files:', error);
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  return (
+    <div className="project-context-upload" style={{
+      padding: '20px',
+      backgroundColor: '#f8fafc',
+      borderRadius: '8px',
+      marginBottom: '20px'
+    }}>
+      <h3 style={{ marginBottom: '15px', color: '#1e293b' }}>Project Context</h3>
+      <div style={{ marginBottom: '15px' }}>
+        <input
+          type="text"
+          placeholder="Project Name"
+          value={projectName}
+          onChange={(e) => setProjectName(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '8px',
+            marginBottom: '10px',
+            borderRadius: '4px',
+            border: '1px solid #e2e8f0'
+          }}
+        />
+        <textarea
+          placeholder="Project Description"
+          value={projectDescription}
+          onChange={(e) => setProjectDescription(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '8px',
+            marginBottom: '10px',
+            borderRadius: '4px',
+            border: '1px solid #e2e8f0',
+            minHeight: '100px',
+            resize: 'vertical'
+          }}
+        />
+      </div>
+      <div style={{ marginBottom: '15px' }}>
+        <input
+          type="file"
+          multiple
+          ref={fileInputRef}
+          onChange={handleFileUpload}
+          style={{ display: 'none' }}
+          accept=".txt,.pdf,.docx,.xlsx,.csv"
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          style={{
+            backgroundColor: '#3B82F6',
+            color: 'white',
+            padding: '10px 20px',
+            borderRadius: '6px',
+            border: 'none',
+            cursor: 'pointer',
+            marginRight: '10px'
+          }}
+        >
+          Upload Project Files
+        </button>
+        <span style={{ fontSize: '14px', color: '#64748b' }}>
+          Supported formats: TXT, PDF, DOCX, XLSX, CSV
+        </span>
+      </div>
+      {documents.length > 0 && (
+        <div style={{ marginTop: '15px' }}>
+          <h4 style={{ marginBottom: '10px', color: '#1e293b' }}>Uploaded Documents:</h4>
+          <ul style={{ listStyle: 'none', padding: 0 }}>
+            {documents.map((doc, index) => (
+              <li key={index} style={{
+                padding: '8px',
+                backgroundColor: 'white',
+                borderRadius: '4px',
+                marginBottom: '5px',
+                border: '1px solid #e2e8f0'
+              }}>
+                {doc.filename} ({Math.round(doc.file_size / 1024)} KB)
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Chat: React.FC = () => {
   const [key, setKey] = useState(0);
   const [showResponse, setShowResponse] = useState(false);
@@ -60,6 +192,11 @@ const Chat: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [projectContext, setProjectContext] = useState<ProjectContext>({
+    name: '',
+    description: '',
+    documents: []
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -174,10 +311,10 @@ const Chat: React.FC = () => {
 
     setIsUploading(true);
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('files', file);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/documents/upload?sessionId=${sessionId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/documents/upload?session_id=${sessionId}`, {
         method: 'POST',
         body: formData
       });
@@ -272,6 +409,9 @@ const Chat: React.FC = () => {
       margin: '0 auto',
       padding: '20px'
     }}>
+      <button style={{ backgroundColor: '#10B981', color: 'white', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', fontSize: '18px', marginBottom: '20px' }}>
+        TEST BUTTON - Chat.tsx is rendering
+      </button>
       {/* Status and New Session Button */}
       <div style={{
         display: 'flex',
@@ -307,6 +447,13 @@ const Chat: React.FC = () => {
           New Session
         </button>
       </div>
+
+      {!sessionId && (
+        <ProjectContextUpload
+          onContextUpdate={setProjectContext}
+          documents={projectContext.documents}
+        />
+      )}
 
       {/* Chat Messages */}
       <div style={{
