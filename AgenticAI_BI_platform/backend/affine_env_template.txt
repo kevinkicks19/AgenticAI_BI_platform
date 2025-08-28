@@ -1,0 +1,21 @@
+# Affine Integration Configuration
+# Copy this content to your .env file and fill in your actual values
+
+# Affine API Configuration
+AFFINE_API_URL=https://app.affine.pro
+AFFINE_API_KEY=your_affine_api_key_here
+AFFINE_WORKSPACE_ID=your_affine_workspace_id_here
+
+# Optional: Custom Affine instance (if self-hosted)
+# AFFINE_API_URL=https://your-affine-instance.com
+
+# Note: Get these values from your Affine workspace settings
+# 1. Go to your Affine workspace
+# 2. Navigate to Settings > API Keys
+# 3. Generate a new API key
+# 4. Copy the workspace ID from the URL or settings
+
+# Example .env file content:
+# AFFINE_API_URL=https://app.affine.pro
+# AFFINE_API_KEY=aff_1234567890abcdef
+# AFFINE_WORKSPACE_ID=workspace_abcdef123456

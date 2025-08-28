@@ -1,0 +1,238 @@
+{
+  "name": "Business Problem Inception Agent - Advanced",
+  "nodes": [
+    {
+      "id": "webhook-trigger",
+      "name": "Inception Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "inception-agent",
+        "options": {
+          "responseMode": "responseNode",
+          "responseData": "allEntries"
+        }
+      }
+    },
+    {
+      "id": "ai-agent",
+      "name": "Inception AI Agent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [300, 0],
+      "parameters": {
+        "authentication": "apiKey",
+        "operation": "chat",
+        "model": "gpt-4o-mini",
+        "messages": {
+          "messageValues": [
+            {
+              "role": "system",
+              "content": "You are a Business Problem Inception Agent specializing in Disciplined Agile Delivery (DAD) methodology. Your role is to guide users through creating a comprehensive inception report by asking probing questions and documenting their business problem.\n\n**Your Core Function:**\n- Ask the 5 most important unanswered questions about their business problem\n- Guide them through the DAD inception process systematically\n- Help identify gaps in business understanding\n- Create and maintain a structured inception document\n- Wait for \"no more questions\" response before finalizing\n\n**DAD Inception Process Goals:**\n1. **Form Team** - Identify key stakeholders and team members\n2. **Align with Enterprise Direction** - Ensure strategic alignment\n3. **Understand the Problem** - Define the business problem clearly\n4. **Identify a Potential Solution** - Outline solution approach\n5. **Determine the Project Scope** - Define what is in/out of scope\n6. **Identify Technical Strategy** - Determine technical approach\n7. **Identify Initial Risk** - Assess potential challenges\n8. **Identify Success Criteria** - Define how success will be measured\n9. **Obtain Stakeholder Agreement** - Ensure buy-in from key parties\n10. **Fund the Project** - Understand budget and resource constraints\n\n**Your Approach:**\n- Start by asking about their business problem\n- Ask 5 most critical unanswered questions\n- Use DAD methodology to structure the conversation\n- Focus on actionable insights and next steps\n- Maintain conversation context until they say \"no more questions\"\n- Then help finalize the inception document\n\n**Document Structure:**\n- Problem Statement\n- Stakeholders and Team\n- Solution Approach\n- Scope Definition\n- Technical Strategy\n- Risk Assessment\n- Success Criteria\n- Resource Requirements\n- Timeline and Milestones\n- Next Steps\n\nRespond conversationally and helpfully, always guiding toward a complete inception report. Ask one question at a time and wait for their response."
+            },
+            {
+              "role": "user",
+              "content": "{{ $json.message }}"
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 1500,
+          "temperature": 0.7
+        }
+      }
+    },
+    {
+      "id": "decision-node",
+      "name": "Check if Finalizing",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [600, 0],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.message.toLowerCase() }}",
+              "rightValue": "no more questions",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ]
+        },
+        "combineOperation": "any"
+      }
+    },
+    {
+      "id": "finalize-doc",
+      "name": "Finalize Document",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [600, 200],
+      "parameters": {
+        "authentication": "apiKey",
+        "operation": "chat",
+        "model": "gpt-4o-mini",
+        "messages": {
+          "messageValues": [
+            {
+              "role": "system",
+              "content": "Create a comprehensive Business Problem Inception Report in markdown format based on the conversation history. Structure it according to DAD methodology with these sections:\n\n1. **Executive Summary**\n2. **Problem Statement**\n3. **Stakeholders and Team**\n4. **Solution Approach**\n5. **Scope Definition**\n6. **Technical Strategy**\n7. **Risk Assessment**\n8. **Success Criteria**\n9. **Resource Requirements**\n10. **Timeline and Milestones**\n11. **Next Steps**\n12. **Document Metadata** (version, status, timestamp)\n\nMake it professional, actionable, and ready for stakeholder review. Include all insights from the conversation."
+            },
+            {
+              "role": "user",
+              "content": "{{ $json.choices[0].message.content }}"
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 2000,
+          "temperature": 0.3
+        }
+      }
+    },
+    {
+      "id": "affine-store",
+      "name": "Store in Affine",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [900, 200],
+      "parameters": {
+        "url": "https://app.affine.pro/api/workspaces/{{ $json.workspace_id || 'default' }}/pages",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "httpHeaderAuth": "Bearer {{ $json.affine_token || 'your-affine-token' }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "title",
+              "value": "Business Problem Inception Report - {{ $json.session_id || 'default' }}"
+            },
+            {
+              "name": "content",
+              "value": "{{ $json.choices[0].message.content }}"
+            },
+            {
+              "name": "tags",
+              "value": "[\"inception\", \"business-problem\", \"dad\"]"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "responseFormat": "json"
+          }
+        }
+      }
+    },
+    {
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1200, 200],
+      "parameters": {
+        "responseCode": 200,
+        "responseMode": "responseBody",
+        "responseBody": "{\"response\": \"�� **Inception Report Created Successfully!**\\n\\nYour Business Problem Inception Report has been generated and stored in Affine. The document includes:\\n\\n✅ **Complete DAD Methodology Coverage**\\n✅ **Structured Problem Analysis**\\n✅ **Actionable Next Steps**\\n✅ **Professional Documentation**\\n\\nYou can now access your inception report in your Affine workspace. The document contains all the insights from our conversation and is ready for stakeholder review.\", \"session_id\": \"{{ $json.session_id || 'default' }}\", \"workflow_status\": \"completed\", \"document_created\": true, \"affine_url\": \"{{ $json.affine_url || 'Check your Affine workspace' }}\"}"
+      }
+    },
+    {
+      "id": "continue-response",
+      "name": "Continue Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 0],
+      "parameters": {
+        "responseCode": 200,
+        "responseMode": "responseBody",
+        "responseBody": "{\"response\": \"{{ $json.choices[0].message.content }}\", \"session_id\": \"{{ $json.sessionId || $json.session_id || 'default' }}\", \"workflow_status\": \"in_progress\", \"next_action\": \"continue_questioning\", \"questions_asked\": \"{{ $json.questions_asked || 0 }}\", \"dad_phase\": \"{{ $json.current_dad_phase || 'problem_understanding' }}\"}"
+      }
+    }
+  ],
+  "connections": {
+    "Inception Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Inception AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inception AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Check if Finalizing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Finalizing": {
+      "main": [
+        [
+          {
+            "node": "Continue Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Finalizing": {
+      "main": [
+        [
+          {
+            "node": "Finalize Document",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Finalize Document": {
+      "main": [
+        [
+          {
+            "node": "Store in Affine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store in Affine": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true
+  }
+}

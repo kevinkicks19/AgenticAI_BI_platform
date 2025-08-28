@@ -1,20 +1,26 @@
-import React from 'react';
+import { AppBar, Toolbar, Typography, IconButton, Avatar, Box } from '@mui/material';
+import DescriptionIcon from '@mui/icons-material/Description';
+import SettingsIcon from '@mui/icons-material/Settings';
+import FeedbackIcon from '@mui/icons-material/Feedback';
 
-const Header = () => {
+const user = { name: "Demo User", avatarUrl: "" };
+const project = "Agentic BI";
+const organization = "Your Org";
+
+export default function Header() {
   return (
-    <header className="flex items-center justify-between bg-white border-b px-6 py-3 h-16">
-      <div className="flex items-center gap-4">
-        <span className="font-bold text-xl">mem0</span>
-        <span className="text-gray-400">/</span>
-        <span className="font-medium text-lg">kevin68-default-org</span>
-        <span className="text-gray-400">/</span>
-        <span className="font-medium text-lg">default-project</span>
-      </div>
-      <div className="flex items-center gap-4">
-        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold">K</div>
-      </div>
-    </header>
+    <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+      <Toolbar>
+        <Typography variant="h6" sx={{ flexGrow: 1 }}>
+          {organization} / {project}
+        </Typography>
+        <IconButton color="inherit" title="Docs"><DescriptionIcon /></IconButton>
+        <IconButton color="inherit" title="Settings"><SettingsIcon /></IconButton>
+        <IconButton color="inherit" title="Feedback"><FeedbackIcon /></IconButton>
+        <Box sx={{ ml: 2 }}>
+          <Avatar alt={user.name} src={user.avatarUrl} />
+        </Box>
+      </Toolbar>
+    </AppBar>
   );
-};
-
-export default Header; 
+} 

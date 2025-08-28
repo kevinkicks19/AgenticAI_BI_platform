@@ -4,199 +4,29 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
-}
-
-interface ResponseButtonProps {
-  onClick: () => void;
-  label: string;
-}
-
-interface ApprovalRequest {
-  requestId: string;
-  message: string;
-  options: string[];
-}
-
-interface Document {
-  filename: string;
-  upload_time: string;
-  content_type: string;
-  file_size: number;
-}
-
-interface ProjectContext {
-  name: string;
-  description: string;
-  documents: Document[];
-}
-
-const API_BASE_URL = 'http://localhost:8000';
-
-const ResponseButton: React.FC<ResponseButtonProps> = ({ onClick, label }) => (
-  <button
-    onClick={onClick}
-    style={{
-      backgroundColor: '#3B82F6',
-      color: 'white',
-      padding: '10px 20px',
-      borderRadius: '6px',
-      border: 'none',
-      margin: '5px',
-      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-      cursor: 'pointer',
-      fontWeight: '500',
-      fontSize: '14px',
-    }}
-    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#2563EB'}
-    onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#3B82F6'}
-  >
-    {label}
-  </button>
-);
-
-const ProjectContextUpload: React.FC<{
-  onContextUpdate: (context: ProjectContext) => void;
-  documents: Document[];
-}> = ({ onContextUpdate, documents }) => {
-  const [projectName, setProjectName] = useState('');
-  const [projectDescription, setProjectDescription] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    const formData = new FormData();
-    for (let i = 0; i < files.length; i++) {
-      formData.append('files', files[i]);
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/documents/upload`, {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!response.ok) throw new Error('Failed to upload documents');
-      
-      const data = await response.json();
-      onContextUpdate({
-        name: projectName,
-        description: projectDescription,
-        documents: [...documents, ...data.documents]
-      });
-    } catch (error) {
-      console.error('Error uploading files:', error);
-    } finally {
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
+  agent_info?: {
+    name: string;
+    description: string;
+    capabilities?: string[];
   };
+  guardrail_violation?: {
+    guardrail: string;
+    name: string;
+    description: string;
+  };
+  status?: 'handoff' | 'guardrail_violation' | 'success';
+}
 
-  return (
-    <div className="project-context-upload" style={{
-      padding: '20px',
-      backgroundColor: '#f8fafc',
-      borderRadius: '8px',
-      marginBottom: '20px'
-    }}>
-      <h3 style={{ marginBottom: '15px', color: '#1e293b' }}>Project Context</h3>
-      <div style={{ marginBottom: '15px' }}>
-        <input
-          type="text"
-          placeholder="Project Name"
-          value={projectName}
-          onChange={(e) => setProjectName(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '8px',
-            marginBottom: '10px',
-            borderRadius: '4px',
-            border: '1px solid #e2e8f0'
-          }}
-        />
-        <textarea
-          placeholder="Project Description"
-          value={projectDescription}
-          onChange={(e) => setProjectDescription(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '8px',
-            marginBottom: '10px',
-            borderRadius: '4px',
-            border: '1px solid #e2e8f0',
-            minHeight: '100px',
-            resize: 'vertical'
-          }}
-        />
-      </div>
-      <div style={{ marginBottom: '15px' }}>
-        <input
-          type="file"
-          multiple
-          ref={fileInputRef}
-          onChange={handleFileUpload}
-          style={{ display: 'none' }}
-          accept=".txt,.pdf,.docx,.xlsx,.csv"
-        />
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          style={{
-            backgroundColor: '#3B82F6',
-            color: 'white',
-            padding: '10px 20px',
-            borderRadius: '6px',
-            border: 'none',
-            cursor: 'pointer',
-            marginRight: '10px'
-          }}
-        >
-          Upload Project Files
-        </button>
-        <span style={{ fontSize: '14px', color: '#64748b' }}>
-          Supported formats: TXT, PDF, DOCX, XLSX, CSV
-        </span>
-      </div>
-      {documents.length > 0 && (
-        <div style={{ marginTop: '15px' }}>
-          <h4 style={{ marginBottom: '10px', color: '#1e293b' }}>Uploaded Documents:</h4>
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {documents.map((doc, index) => (
-              <li key={index} style={{
-                padding: '8px',
-                backgroundColor: 'white',
-                borderRadius: '4px',
-                marginBottom: '5px',
-                border: '1px solid #e2e8f0'
-              }}>
-                {doc.filename} ({Math.round(doc.file_size / 1024)} KB)
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-};
+const API_BASE_URL = 'http://localhost:5000';
 
 const Chat: React.FC = () => {
-  const [key, setKey] = useState(0);
-  const [showResponse, setShowResponse] = useState(false);
-  const [currentRequest, setCurrentRequest] = useState<ApprovalRequest | null>(null);
-  const [chatStatus, setChatStatus] = useState<'idle' | 'waiting' | 'error'>('idle');
+  console.log('Chat component is rendering...');
+  
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [chatStatus, setChatStatus] = useState<'idle' | 'waiting' | 'error'>('idle');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [projectContext, setProjectContext] = useState<ProjectContext>({
-    name: '',
-    description: '',
-    documents: []
-  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -235,10 +65,6 @@ const Chat: React.FC = () => {
         content: data.response,
         timestamp: new Date().toISOString()
       }]);
-      setDocuments([]);
-      setKey(prev => prev + 1);
-      setShowResponse(false);
-      setCurrentRequest(null);
       setChatStatus('idle');
     } catch (error) {
       console.error('Error creating new session:', error);
@@ -254,13 +80,14 @@ const Chat: React.FC = () => {
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !sessionId) return;
 
-    const newMessage: Message = {
+    const message = inputMessage;
+    const userMessage: Message = {
       role: 'user',
-      content: inputMessage,
+      content: message,
       timestamp: new Date().toISOString()
     };
-
-    setMessages(prev => [...prev, newMessage]);
+    
+    setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setChatStatus('waiting');
 
@@ -272,7 +99,7 @@ const Chat: React.FC = () => {
         },
         body: JSON.stringify({
           sessionId,
-          message: inputMessage
+          message: message
         })
       });
 
@@ -283,12 +110,25 @@ const Chat: React.FC = () => {
       
       const data = await response.json();
       
-      if (data.status === 'success') {
-        setMessages(prev => [...prev, {
+      if (data.status === 'success' || data.status === 'handoff' || data.status === 'guardrail_violation') {
+        const assistantMessage: Message = {
           role: 'assistant',
           content: data.response,
-          timestamp: new Date().toISOString()
-        }]);
+          timestamp: new Date().toISOString(),
+          status: data.status
+        };
+        
+        // Add agent info if available
+        if (data.agent_info) {
+          assistantMessage.agent_info = data.agent_info;
+        }
+        
+        // Add guardrail violation info if available
+        if (data.violations && data.violations.length > 0) {
+          assistantMessage.guardrail_violation = data.violations[0];
+        }
+        
+        setMessages(prev => [...prev, assistantMessage]);
       } else {
         throw new Error(data.detail || 'Unexpected response format');
       }
@@ -305,101 +145,13 @@ const Chat: React.FC = () => {
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !sessionId) return;
-
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append('files', file);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/documents/upload?session_id=${sessionId}`, {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!response.ok) throw new Error('Failed to upload document');
-      
-      const data = await response.json();
-      setDocuments(prev => [...prev, {
-        filename: data.metadata.filename,
-        upload_time: data.metadata.upload_time,
-        content_type: data.metadata.content_type,
-        file_size: data.metadata.file_size
-      }]);
-
-      // Add a system message about the upload
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `Document "${file.name}" has been uploaded and processed.`,
-        timestamp: new Date().toISOString()
-      }]);
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      setChatStatus('error');
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
     }
   };
-
-  const handleResponse = async (response: string) => {
-    if (!currentRequest) return;
-    
-    console.log('User responded with:', response);
-    try {
-      // Send the response back to the backend
-      const responseUrl = `${API_BASE_URL}/api/approval/${currentRequest.requestId}?response=${encodeURIComponent(response)}`;
-      const result = await fetch(responseUrl, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!result.ok) {
-        throw new Error('Failed to send response');
-      }
-
-      setShowResponse(false);
-      setCurrentRequest(null);
-      setChatStatus('idle');
-    } catch (error) {
-      console.error('Error sending response:', error);
-      setChatStatus('error');
-    }
-  };
-
-  // Function to check for pending approval requests
-  const checkForApprovalRequests = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/approval/pending`);
-      if (response.ok) {
-        const request: ApprovalRequest = await response.json();
-        if (request) {
-          setCurrentRequest(request);
-          setShowResponse(true);
-          setChatStatus('waiting');
-        }
-      }
-    } catch (error) {
-      console.error('Error checking for approval requests:', error);
-      setChatStatus('error');
-    }
-  };
-
-  useEffect(() => {
-    // Set up polling for approval requests
-    const pollInterval = setInterval(checkForApprovalRequests, 5000); // Check every 5 seconds
-
-    return () => {
-      clearInterval(pollInterval);
-    };
-  }, [key]); // Reset polling when session changes
-
+  
   return (
     <div style={{ 
       display: 'flex', 
@@ -409,9 +161,18 @@ const Chat: React.FC = () => {
       margin: '0 auto',
       padding: '20px'
     }}>
-      <button style={{ backgroundColor: '#10B981', color: 'white', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', fontSize: '18px', marginBottom: '20px' }}>
-        TEST BUTTON - Chat.tsx is rendering
+      <button style={{ 
+        backgroundColor: '#10B981', 
+        color: 'white', 
+        padding: '10px 20px', 
+        borderRadius: '8px', 
+        fontWeight: 'bold', 
+        fontSize: '18px', 
+        marginBottom: '20px' 
+      }}>
+        ✅ Chat Component is Working!
       </button>
+
       {/* Status and New Session Button */}
       <div style={{
         display: 'flex',
@@ -441,20 +202,11 @@ const Chat: React.FC = () => {
             fontWeight: 'bold',
             fontSize: '16px',
           }}
-          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#CC0000'}
-          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#FF0000'}
         >
           New Session
         </button>
       </div>
-
-      {!sessionId && (
-        <ProjectContextUpload
-          onContextUpdate={setProjectContext}
-          documents={projectContext.documents}
-        />
-      )}
-
+      
       {/* Chat Messages */}
       <div style={{
         flex: 1,
@@ -462,176 +214,106 @@ const Chat: React.FC = () => {
         padding: '20px',
         backgroundColor: '#f5f5f5',
         borderRadius: '8px',
-        marginBottom: '20px'
+        marginBottom: '20px',
+        minHeight: '400px'
       }}>
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: message.role === 'user' ? 'flex-end' : 'flex-start',
-              marginBottom: '10px'
-            }}
-          >
-            <div style={{
-              maxWidth: '70%',
-              padding: '10px 15px',
-              borderRadius: '12px',
-              backgroundColor: message.role === 'user' ? '#3B82F6' : 'white',
-              color: message.role === 'user' ? 'white' : 'black',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-            }}>
-              {message.content}
-            </div>
-            <div style={{
-              fontSize: '12px',
-              color: '#666',
-              marginTop: '4px'
-            }}>
-              {new Date(message.timestamp).toLocaleTimeString()}
-            </div>
+        {messages.length === 0 ? (
+          <div style={{
+            textAlign: 'center',
+            color: '#666',
+            fontSize: '16px',
+            marginTop: '50px'
+          }}>
+            Click "New Session" to start chatting with the AI coordinator!
           </div>
-        ))}
+        ) : (
+          messages.map((message, index) => (
+            <div key={index} style={{
+              marginBottom: '15px',
+              padding: '12px',
+              borderRadius: '8px',
+              backgroundColor: message.role === 'user' ? '#e3f2fd' : '#f5f5f5',
+              borderLeft: message.role === 'user' ? '4px solid #2196f3' : '4px solid #4caf50'
+            }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
+                {message.role === 'user' ? 'You' : 'Assistant'}
+                {message.agent_info && (
+                  <span style={{ 
+                    marginLeft: '10px', 
+                    fontSize: '12px', 
+                    color: '#666',
+                    backgroundColor: '#fff3cd',
+                    padding: '2px 6px',
+                    borderRadius: '4px'
+                  }}>
+                    🤖 {message.agent_info.name}
+                  </span>
+                )}
+                {message.guardrail_violation && (
+                  <span style={{ 
+                    marginLeft: '10px', 
+                    fontSize: '12px', 
+                    color: '#721c24',
+                    backgroundColor: '#f8d7da',
+                    padding: '2px 6px',
+                    borderRadius: '4px'
+                  }}>
+                    ⚠️ {message.guardrail_violation.name}
+                  </span>
+                )}
+              </div>
+              <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
+              <div style={{ fontSize: '10px', color: '#666', marginTop: '5px' }}>
+                {new Date(message.timestamp).toLocaleTimeString()}
+              </div>
+            </div>
+          ))
+        )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Document List */}
-      {documents.length > 0 && (
-        <div style={{
-          marginBottom: '20px',
-          padding: '15px',
-          backgroundColor: 'white',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-        }}>
-          <h3 style={{ margin: '0 0 10px 0' }}>Uploaded Documents</h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-            {documents.map((doc, index) => (
-              <div
-                key={index}
-                style={{
-                  padding: '8px 12px',
-                  backgroundColor: '#f0f0f0',
-                  borderRadius: '4px',
-                  fontSize: '14px'
-                }}
-              >
-                {doc.filename} ({new Date(doc.upload_time).toLocaleString()})
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Input Area */}
+      {/* Message Input */}
       <div style={{
         display: 'flex',
         gap: '10px',
         padding: '20px',
         backgroundColor: 'white',
         borderRadius: '8px',
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+        border: '1px solid #ddd'
       }}>
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileUpload}
-          style={{ display: 'none' }}
-          accept=".txt,.pdf,.docx,.xls,.xlsx,.csv"
-        />
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading || !sessionId}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#4B5563',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            opacity: isUploading || !sessionId ? 0.5 : 1
-          }}
-        >
-          {isUploading ? 'Uploading...' : 'Upload Document'}
-        </button>
         <input
           type="text"
           value={inputMessage}
           onChange={(e) => setInputMessage(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-          placeholder={sessionId ? "Type your message..." : "Start a new session to chat..."}
-          disabled={!sessionId}
+          onKeyPress={handleKeyPress}
+          placeholder={sessionId ? "Type your message here..." : "Click 'New Session' to start chatting..."}
+          disabled={!sessionId || chatStatus === 'waiting'}
           style={{
             flex: 1,
-            padding: '10px',
+            padding: '12px',
             borderRadius: '6px',
             border: '1px solid #ddd',
-            fontSize: '16px'
+            fontSize: '16px',
+            opacity: sessionId ? 1 : 0.6
           }}
         />
         <button
           onClick={handleSendMessage}
-          disabled={!inputMessage.trim() || !sessionId}
+          disabled={!sessionId || chatStatus === 'waiting'}
           style={{
-            padding: '10px 20px',
-            backgroundColor: '#3B82F6',
+            backgroundColor: sessionId ? '#3B82F6' : '#ccc',
             color: 'white',
-            border: 'none',
+            padding: '12px 24px',
             borderRadius: '6px',
-            cursor: 'pointer',
-            opacity: !inputMessage.trim() || !sessionId ? 0.5 : 1
+            border: 'none',
+            cursor: sessionId ? 'pointer' : 'not-allowed',
+            fontWeight: 'bold',
+            fontSize: '16px'
           }}
         >
-          Send
+          {chatStatus === 'waiting' ? 'Sending...' : 'Send'}
         </button>
       </div>
-
-      {/* Approval Request Modal */}
-      {showResponse && currentRequest && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '100px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '10px',
-            backgroundColor: 'white',
-            padding: '20px',
-            borderRadius: '12px',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-            zIndex: 1000,
-            maxWidth: '80%',
-            width: '600px',
-          }}
-        >
-          <div style={{ 
-            marginBottom: '10px', 
-            fontWeight: 'bold',
-            fontSize: '16px',
-            textAlign: 'center'
-          }}>
-            {currentRequest.message}
-          </div>
-          <div style={{ 
-            display: 'flex', 
-            gap: '10px', 
-            flexWrap: 'wrap', 
-            justifyContent: 'center' 
-          }}>
-            {currentRequest.options.map((option, index) => (
-              <ResponseButton
-                key={index}
-                label={option}
-                onClick={() => handleResponse(option)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

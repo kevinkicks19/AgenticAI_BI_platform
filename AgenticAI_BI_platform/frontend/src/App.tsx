@@ -1,25 +1,34 @@
-import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
-import Chat from './components/Chat';
-import Header from './components/Header';
-import Sidebar from './components/Sidebar';
+import React, { useState } from 'react';
+import './App.css';
+import ChatContainerManager from './components/ChatContainerManager';
+import DocumentManager from './components/DocumentManager';
+import Navigation from './components/Navigation';
+import WorkflowManager from './components/WorkflowManager';
 
-const App: React.FC = () => {
+function App() {
+  const [activeTab, setActiveTab] = useState('ai-coordinator');
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'ai-coordinator':
+        return <ChatContainerManager />;
+      case 'workflows':
+        return <WorkflowManager />;
+      case 'documents':
+        return <DocumentManager />;
+      default:
+        return <ChatContainerManager />;
+    }
+  };
+
   return (
-    <Router>
-      <div className="flex h-screen w-screen bg-gray-50">
-        <Sidebar />
-        <div className="flex flex-col flex-1 min-w-0">
-          <Header />
-          <main className="flex-1 overflow-auto p-6">
-            <Routes>
-              <Route path="/chat" element={<Chat />} />
-              <Route path="/" element={<Chat />} /> {/* Redirect root to chat for now */}
-            </Routes>
-          </main>
-        </div>
-      </div>
-    </Router>
+    <div className="App">
+      <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <main className="flex-1 overflow-hidden">
+        {renderContent()}
+      </main>
+    </div>
   );
-};
+}
 
 export default App; 
