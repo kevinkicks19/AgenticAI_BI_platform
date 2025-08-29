@@ -1,0 +1,10 @@
+- **Always use the n8n MCP server for any n8n automation, workflow, or integration task**
+  - All workflow creation, management, and automation should be performed via the n8n MCP server tools, not direct API calls or manual UI steps
+  - Prefer MCP tools for workflow validation, node management, and execution
+  - If a task can be accomplished via the n8n MCP server, do not use alternative methods
+  - Example (✅ DO): Use `mcp_n8n-mcp_n8n_create_workflow` to create workflows
+  - Example (❌ DON'T): Manually create workflows in the n8n web UI or call the n8n REST API directly
+description:
+globs:
+alwaysApply: false
+---
