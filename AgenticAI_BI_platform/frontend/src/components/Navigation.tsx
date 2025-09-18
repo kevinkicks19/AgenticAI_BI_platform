@@ -1,5 +1,6 @@
-import { Bot, FileText, Workflow } from 'lucide-react';
+import { BarChart3, Bot, FileText, Settings, TrendingUp, Workflow } from 'lucide-react';
 import React from 'react';
+import NotificationBell from './NotificationBell';
 
 interface NavigationProps {
   activeTab: string;
@@ -8,6 +9,12 @@ interface NavigationProps {
 
 const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
   const navItems = [
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: BarChart3,
+      description: 'Overview of system metrics and activity'
+    },
     {
       id: 'ai-coordinator',
       label: 'AI Coordinator',
@@ -21,19 +28,34 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
       description: 'Manage and monitor n8n workflows'
     },
     {
+      id: 'analytics',
+      label: 'Analytics',
+      icon: TrendingUp,
+      description: 'Advanced analytics and data visualization'
+    },
+    {
       id: 'documents',
       label: 'Documents',
       icon: FileText,
       description: 'Upload and manage Affine documents'
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      icon: Settings,
+      description: 'Configure preferences and system settings'
     }
   ];
 
   return (
     <nav className="w-64 bg-white border-r border-gray-200 p-4 h-screen">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Agentic AI BI</h1>
-        <p className="text-sm text-gray-600">Business Intelligence Platform</p>
-      </div>
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-xl font-bold text-gray-900">Agentic AI BI</h1>
+            <NotificationBell />
+          </div>
+          <p className="text-sm text-gray-600">Business Intelligence Platform</p>
+        </div>
 
       <div className="space-y-2">
         {navItems.map((item) => {

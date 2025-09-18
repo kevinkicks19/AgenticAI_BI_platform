@@ -23,6 +23,9 @@ FROM python:3.10-slim
 RUN apt-get update && apt-get install -y \
     libmagic1 \
     curl \
+    libmagic-dev \
+    gcc \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -38,6 +41,13 @@ COPY backend/ .
 # Copy built frontend from frontend-builder stage
 COPY --from=frontend-builder /app/dist ./static
 
+# Create uploads directory
+RUN mkdir -p /app/uploads
+
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
 # Expose the port the backend runs on
 EXPOSE 5000
 
@@ -45,6 +55,11 @@ EXPOSE 5000
 ENV PYTHONPATH=/app
 ENV HOST=0.0.0.0
 ENV PORT=5000
+ENV PYTHONUNBUFFERED=1
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/api/upload/health || exit 1
 
 # Start the application directly
 CMD ["python", "app.py"] 

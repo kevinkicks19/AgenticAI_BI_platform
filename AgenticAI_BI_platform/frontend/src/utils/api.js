@@ -1,10 +1,10 @@
 async function fetchAgents() {
-  const response = await fetch('http://localhost:5000/api/agents');
+  const response = await fetch('http://192.168.0.18:8000/api/agents');
   return response.json();
 }
 
 async function fetchData() {
-  const response = await fetch('http://localhost:5000/api/data');
+  const response = await fetch('http://192.168.0.18:8000/api/data');
   return response.json();
 }
 

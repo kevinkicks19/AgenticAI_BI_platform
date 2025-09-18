@@ -54,6 +54,10 @@ app.include_router(approval_router, prefix="/api/approval")
 from affine_routes import router as affine_router
 app.include_router(affine_router)
 
+# Import and include file upload routes
+from file_upload_routes import router as upload_router
+app.include_router(upload_router)
+
 # Import Affine service for inception documents
 from affine_service import affine_service
 

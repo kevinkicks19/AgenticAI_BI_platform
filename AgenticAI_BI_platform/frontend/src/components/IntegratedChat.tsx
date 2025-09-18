@@ -31,7 +31,7 @@ const IntegratedChat: React.FC = () => {
 
   const initializeChat = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/chat');
+      const response = await fetch('http://192.168.0.18:8000/api/chat');
       if (response.ok) {
         const data = await response.json();
         setSessionId(data.session_id || 'default');
@@ -74,7 +74,7 @@ const IntegratedChat: React.FC = () => {
     setCurrentTurn(prev => prev + 1);
 
     try {
-      const response = await fetch('http://localhost:5000/api/chat', {
+      const response = await fetch('http://192.168.0.18:8000/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

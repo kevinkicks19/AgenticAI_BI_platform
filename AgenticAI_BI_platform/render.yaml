@@ -1,0 +1,57 @@
+services:
+  - type: web
+    name: agentic-ai-bi-platform
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    region: oregon
+    branch: main
+    buildCommand: ""
+    startCommand: ""
+    healthCheckPath: /api/upload/health
+    envVars:
+      - key: PYTHONPATH
+        value: /app
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 5000
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PERPLEXITY_API_KEY
+        sync: false
+      - key: N8N_API_KEY
+        sync: false
+      - key: N8N_BASE_URL
+        sync: false
+      - key: AFFINE_API_KEY
+        sync: false
+      - key: AFFINE_WORKSPACE_ID
+        sync: false
+    disk:
+      name: uploads
+      mountPath: /app/uploads
+      sizeGB: 1
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-XSS-Protection
+        value: 1; mode=block
+      - path: /api/*
+        name: Access-Control-Allow-Origin
+        value: "*"
+      - path: /api/*
+        name: Access-Control-Allow-Methods
+        value: "GET, POST, PUT, DELETE, OPTIONS"
+      - path: /api/*
+        name: Access-Control-Allow-Headers
+        value: "Content-Type, Authorization"

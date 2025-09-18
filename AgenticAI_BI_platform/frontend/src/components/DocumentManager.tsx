@@ -1,26 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Search, 
-  Plus, 
-  FileText, 
-  Filter, 
-  SortAsc, 
-  SortDesc,
-  Eye,
-  Edit,
-  Trash2,
-  Download,
-  Share2,
-  Tag,
-  Calendar,
-  User,
-  FolderOpen,
-  BookOpen,
-  BarChart3,
-  Users,
-  TrendingUp,
-  Target
+import {
+    BarChart3,
+    BookOpen,
+    Calendar,
+    Download,
+    Edit,
+    Eye,
+    File,
+    FileImage,
+    FileSpreadsheet,
+    FileText,
+    Plus,
+    Search,
+    Share2,
+    Target,
+    TrendingUp,
+    Upload,
+    Users
 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 
 interface AffineDocument {
   id: string;
@@ -39,6 +36,20 @@ interface AffineDocument {
   };
 }
 
+interface UploadedDocument {
+  file_id: string;
+  original_filename: string;
+  document_type: string;
+  category: string;
+  tags: string[];
+  user_id: string;
+  file_size: number;
+  content_type: string;
+  upload_time: string;
+  extracted_text: string;
+  full_text_available: boolean;
+}
+
 interface DocumentType {
   name: string;
   count: number;
@@ -48,14 +59,18 @@ interface DocumentType {
 
 const DocumentManager: React.FC = () => {
   const [documents, setDocuments] = useState<AffineDocument[]>([]);
+  const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
   const [filteredDocuments, setFilteredDocuments] = useState<AffineDocument[]>([]);
+  const [filteredUploadedDocuments, setFilteredUploadedDocuments] = useState<UploadedDocument[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'title' | 'created_at' | 'updated_at'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<AffineDocument | null>(null);
+  const [selectedUploadedDocument, setSelectedUploadedDocument] = useState<UploadedDocument | null>(null);
   const [documentForm, setDocumentForm] = useState({
     title: '',
     content: '',
@@ -64,6 +79,31 @@ const DocumentManager: React.FC = () => {
     tags: [] as string[],
     priority: 'medium'
   });
+  const [uploadForm, setUploadForm] = useState({
+    file: null as File | null,
+    document_type: '',
+    category: '',
+    tags: [] as string[],
+    user_id: 'current-user'
+  });
+  const [uploading, setUploading] = useState(false);
+
+  // Load uploaded documents
+  useEffect(() => {
+    const loadUploadedDocuments = async () => {
+      try {
+        const response = await fetch('/api/upload/documents');
+        if (response.ok) {
+          const data = await response.json();
+          setUploadedDocuments(data.documents || []);
+        }
+      } catch (error) {
+        console.error('Error loading uploaded documents:', error);
+      }
+    };
+    
+    loadUploadedDocuments();
+  }, []);
 
   // Mock data for demonstration
   useEffect(() => {
@@ -153,6 +193,55 @@ const DocumentManager: React.FC = () => {
     // Note: In a real app, you'd update the state here
   }, [documents]);
 
+  // Upload file function
+  const uploadFile = async () => {
+    if (!uploadForm.file) {
+      alert('Please select a file to upload');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadForm.file);
+      formData.append('document_type', uploadForm.document_type);
+      formData.append('category', uploadForm.category);
+      formData.append('tags', uploadForm.tags.join(','));
+      formData.append('user_id', uploadForm.user_id);
+
+      const response = await fetch('/api/upload/document', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('File uploaded successfully:', result);
+        
+        // Add to local state
+        setUploadedDocuments(prev => [result.document, ...prev]);
+        
+        // Reset form
+        setUploadForm({
+          file: null,
+          document_type: '',
+          category: '',
+          tags: [],
+          user_id: 'current-user'
+        });
+        setShowUploadModal(false);
+      } else {
+        const error = await response.json();
+        alert(`Upload failed: ${error.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   // Filter and sort documents
   useEffect(() => {
     let filtered = documents.filter(doc => {
@@ -187,6 +276,41 @@ const DocumentManager: React.FC = () => {
 
     setFilteredDocuments(filtered);
   }, [documents, searchQuery, selectedType, selectedCategory, sortBy, sortOrder]);
+
+  // Filter and sort uploaded documents
+  useEffect(() => {
+    let filtered = uploadedDocuments.filter(doc => {
+      const matchesSearch = doc.original_filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           doc.extracted_text.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           doc.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      const matchesType = selectedType === 'all' || doc.document_type === selectedType;
+      const matchesCategory = selectedCategory === 'all' || doc.category === selectedCategory;
+      
+      return matchesSearch && matchesType && matchesCategory;
+    });
+
+    // Sort uploaded documents
+    filtered.sort((a, b) => {
+      let aValue: any, bValue: any;
+      
+      if (sortBy === 'title') {
+        aValue = a.original_filename.toLowerCase();
+        bValue = b.original_filename.toLowerCase();
+      } else {
+        aValue = new Date(a.upload_time);
+        bValue = new Date(b.upload_time);
+      }
+      
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+    setFilteredUploadedDocuments(filtered);
+  }, [uploadedDocuments, searchQuery, selectedType, selectedCategory, sortBy, sortOrder]);
 
   const createDocument = async () => {
     try {
@@ -292,6 +416,23 @@ const DocumentManager: React.FC = () => {
     }
   };
 
+  const getFileIcon = (contentType: string) => {
+    if (contentType.includes('pdf')) return <FileText className="w-5 h-5" />;
+    if (contentType.includes('word') || contentType.includes('document')) return <FileText className="w-5 h-5" />;
+    if (contentType.includes('spreadsheet') || contentType.includes('excel')) return <FileSpreadsheet className="w-5 h-5" />;
+    if (contentType.includes('image')) return <FileImage className="w-5 h-5" />;
+    if (contentType.includes('text')) return <FileText className="w-5 h-5" />;
+    return <File className="w-5 h-5" />;
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   return (
     <div className="p-6 bg-gray-50">
       <div className="max-w-7xl mx-auto">
@@ -382,12 +523,20 @@ const DocumentManager: React.FC = () => {
                 <Plus className="w-4 h-4" />
                 New Document
               </button>
+              <button
+                onClick={() => setShowUploadModal(true)}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Upload File
+              </button>
             </div>
           </div>
         </div>
 
         {/* Documents Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Affine Documents */}
           {filteredDocuments.map((document) => (
             <div key={document.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
               <div className="p-6">
@@ -449,6 +598,81 @@ const DocumentManager: React.FC = () => {
                   </button>
                   <button className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                     <Edit className="w-4 h-4" />
+                  </button>
+                  <button className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                    <Share2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+          
+          {/* Uploaded Documents */}
+          {filteredUploadedDocuments.map((document) => (
+            <div key={document.file_id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-full bg-green-100 text-green-800">
+                      {getFileIcon(document.content_type)}
+                    </div>
+                    <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                      uploaded
+                    </span>
+                  </div>
+                  <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
+                    {formatFileSize(document.file_size)}
+                  </span>
+                </div>
+
+                <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+                  {document.original_filename}
+                </h3>
+                
+                <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                  {document.extracted_text || '[No text preview available]'}
+                </p>
+
+                {document.tags && document.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {document.tags.slice(0, 3).map((tag) => (
+                      <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
+                        {tag}
+                      </span>
+                    ))}
+                    {document.tags.length > 3 && (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
+                        +{document.tags.length - 3}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-4 h-4" />
+                    <span>{new Date(document.upload_time).toLocaleDateString()}</span>
+                  </div>
+                  {document.category && (
+                    <span className="text-blue-600">
+                      {document.category.replace('_', ' ')}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => window.open(`/api/upload/documents/${document.file_id}/download`, '_blank')}
+                    className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </button>
+                  <button 
+                    onClick={() => setSelectedUploadedDocument(document)}
+                    className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  >
+                    <Eye className="w-4 h-4" />
                   </button>
                   <button className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                     <Share2 className="w-4 h-4" />
@@ -593,6 +817,109 @@ const DocumentManager: React.FC = () => {
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                   >
                     Create Document
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Upload File Modal */}
+        {showUploadModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Document</h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Select File
+                    </label>
+                    <input
+                      type="file"
+                      onChange={(e) => setUploadForm(prev => ({ ...prev, file: e.target.files?.[0] || null }))}
+                      accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.xls,.png,.jpg,.jpeg,.gif,.webp"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Supported formats: PDF, DOC, DOCX, TXT, CSV, XLSX, XLS, PNG, JPG, JPEG, GIF, WEBP (Max 10MB)
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Document Type
+                    </label>
+                    <select
+                      value={uploadForm.document_type}
+                      onChange={(e) => setUploadForm(prev => ({ ...prev, document_type: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="">Select document type</option>
+                      {documentTypes.map(type => (
+                        <option key={type.name} value={type.name}>
+                          {type.name.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Category
+                    </label>
+                    <select
+                      value={uploadForm.category}
+                      onChange={(e) => setUploadForm(prev => ({ ...prev, category: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="">Select category</option>
+                      {categories.map(category => (
+                        <option key={category} value={category}>
+                          {category.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tags
+                    </label>
+                    <input
+                      type="text"
+                      value={uploadForm.tags.join(', ')}
+                      onChange={(e) => setUploadForm(prev => ({ ...prev, tags: e.target.value.split(',').map(t => t.trim()) }))}
+                      placeholder="Enter tags separated by commas"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    onClick={() => setShowUploadModal(false)}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={uploadFile}
+                    disabled={!uploadForm.file || !uploadForm.document_type || uploading}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {uploading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        Upload File
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

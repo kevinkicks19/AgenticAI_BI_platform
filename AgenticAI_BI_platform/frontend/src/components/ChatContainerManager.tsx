@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import EmbeddedN8nChat from './EmbeddedN8nChat';
-import IntegratedChat from './IntegratedChat';
+import EnhancedChat from './EnhancedChat';
 import N8nChatWidget from './N8nChatWidget';
 import WorkflowChat from './WorkflowChat';
 import WorkflowSelector from './WorkflowSelector';
@@ -173,7 +173,7 @@ const ChatContainerManager: React.FC<ChatContainerManagerProps> = ({ onContainer
         {showWorkflowSelector ? (
           <WorkflowSelector onWorkflowSelect={addWorkflowContainer} />
         ) : activeContainer.type === 'coordinator' ? (
-          <IntegratedChat 
+          <EnhancedChat 
             key="coordinator-chat"
           />
         ) : (
