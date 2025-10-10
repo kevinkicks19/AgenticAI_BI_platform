@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { API_BASE_URL } from '../config/api';
+import logger from '../utils/logger';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -24,8 +26,6 @@ interface MessageTemplate {
   content: string;
   category: 'analysis' | 'workflow' | 'document' | 'general';
 }
-
-const API_BASE_URL = 'http://localhost:5000';
 
 const EnhancedChat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -198,7 +198,7 @@ const EnhancedChat: React.FC = () => {
       }]);
       setChatStatus('idle');
     } catch (error) {
-      console.error('Error creating new session:', error);
+      logger.error('Error creating new session:', error);
       setChatStatus('error');
       setMessages([{
         role: 'assistant',
@@ -275,7 +275,7 @@ const EnhancedChat: React.FC = () => {
 
       setChatStatus('idle');
     } catch (error) {
-      console.error('Error sending message:', error);
+      logger.error('Error sending message:', error);
       setChatStatus('error');
       setMessages(prev => [...prev, {
         role: 'assistant',

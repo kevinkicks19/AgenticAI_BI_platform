@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 
 interface Message {
   id: string;
@@ -44,7 +45,7 @@ const HomeAutomationChat: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/handoff/chat/home-automation', {
+      const response = await fetch(API_ENDPOINTS.chatHomeAutomation, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

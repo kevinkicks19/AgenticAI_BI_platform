@@ -1,5 +1,7 @@
 import { Maximize2, Minimize2, Send, Workflow, X } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
+import { API_ENDPOINTS } from '../config/api';
+import logger from '../utils/logger';
 
 interface ChatMessage {
   id: string;
@@ -85,9 +87,9 @@ const EmbeddedN8nChat: React.FC<EmbeddedN8nChatProps> = ({
         }
       };
 
-      console.log(`DEBUG: Executing workflow ${workflowId} via coordinator MCP:`, coordinatorExecutionData);
+      logger.debug(`Executing workflow ${workflowId} via coordinator MCP:`, coordinatorExecutionData);
 
-      const response = await fetch('http://localhost:5000/api/handoff/execute-workflow', {
+      const response = await fetch(API_ENDPOINTS.executeWorkflow, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,7 +99,7 @@ const EmbeddedN8nChat: React.FC<EmbeddedN8nChatProps> = ({
 
       if (response.ok) {
         const result = await response.json();
-        console.log('DEBUG: Coordinator workflow execution result:', result);
+        logger.debug('Coordinator workflow execution result:', result);
         
         if (result.status === 'success') {
           const executionResult = result.execution_result;
@@ -116,7 +118,7 @@ const EmbeddedN8nChat: React.FC<EmbeddedN8nChatProps> = ({
           setMessages(prev => [...prev, assistantMessage]);
           
           // Log execution details
-          console.log(`DEBUG: Workflow executed via ${executionResult.execution_method}:`, executionResult);
+          logger.debug(`Workflow executed via ${executionResult.execution_method}:`, executionResult);
           
         } else {
           throw new Error(`Workflow execution failed: ${result.message}`);
@@ -125,7 +127,7 @@ const EmbeddedN8nChat: React.FC<EmbeddedN8nChatProps> = ({
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
     } catch (error) {
-      console.error('DEBUG: Error executing workflow via coordinator:', error);
+      logger.error('Error executing workflow via coordinator:', error);
       
       const errorMessage: ChatMessage = {
         id: `error-${Date.now()}`,

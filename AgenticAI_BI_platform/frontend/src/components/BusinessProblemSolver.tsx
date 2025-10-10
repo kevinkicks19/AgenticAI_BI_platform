@@ -10,6 +10,8 @@ import {
     Zap
 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
+import { API_ENDPOINTS } from '../config/api';
+import logger from '../utils/logger';
 
 interface BusinessProblem {
   id: string;
@@ -162,7 +164,7 @@ const BusinessProblemSolver: React.FC = () => {
 
   const createProblem = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/affine/documents/business-problem', {
+      const response = await fetch(API_ENDPOINTS.affineBusinessProblem, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -178,7 +180,7 @@ const BusinessProblemSolver: React.FC = () => {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Problem created:', result);
+        logger.debug('Problem created:', result);
         
         // Add to local state
         const newProblem: BusinessProblem = {
@@ -205,19 +207,19 @@ const BusinessProblemSolver: React.FC = () => {
         fetchAffineDocuments();
       }
     } catch (error) {
-      console.error('Error creating problem:', error);
+      logger.error('Error creating problem:', error);
     }
   };
 
   const fetchAffineDocuments = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/affine/documents/search?document_type=business_problem&limit=50');
+      const response = await fetch(`${API_ENDPOINTS.affineSearch}?document_type=business_problem&limit=50`);
       if (response.ok) {
         const data = await response.json();
         setAffineDocuments(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching Affine documents:', error);
+      logger.error('Error fetching Affine documents:', error);
     }
   };
 

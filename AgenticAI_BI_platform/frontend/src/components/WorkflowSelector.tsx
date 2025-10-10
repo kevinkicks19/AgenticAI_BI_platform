@@ -1,5 +1,7 @@
 import { BarChart3, FileText, Home, Workflow } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
+import { API_ENDPOINTS } from '../config/api';
+import logger from '../utils/logger';
 
 interface WorkflowInfo {
   id: string;
@@ -71,12 +73,12 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ onWorkflowSelect })
   const loadWorkflows = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('http://localhost:5000/api/handoff/workflows');
+      const response = await fetch(API_ENDPOINTS.workflows);
       
       if (response.ok) {
         const data = await response.json();
         if (data.status === 'success' && data.workflows.length > 0) {
-          console.log('DEBUG: Backend workflows data:', data.workflows);
+          logger.debug('Backend workflows data:', data.workflows);
           
           // Transform backend workflows to our format
           const backendWorkflows = data.workflows.map((wf: any) => {
@@ -88,7 +90,7 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ onWorkflowSelect })
               webhookUrl: wf.webhook_url || 'https://n8n.casamccartney.link/webhook/chat',
               status: wf.active ? 'active' : 'inactive'
             };
-            console.log(`DEBUG: Transformed workflow: ${workflow.name} -> ID: ${workflow.id}`);
+            logger.debug(`Transformed workflow: ${workflow.name} -> ID: ${workflow.id}`);
             return workflow;
           });
           setWorkflows(backendWorkflows);
@@ -99,7 +101,7 @@ const WorkflowSelector: React.FC<WorkflowSelectorProps> = ({ onWorkflowSelect })
         setWorkflows(defaultWorkflows);
       }
     } catch (error) {
-      console.error('Error loading workflows:', error);
+      logger.error('Error loading workflows:', error);
       setWorkflows(defaultWorkflows);
     } finally {
       setIsLoading(false);

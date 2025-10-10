@@ -35,12 +35,15 @@ class DocumentProcessor:
             length_function=len,
         )
         
-        # Initialize Pinecone
-        self.pc = PineconeClient(api_key=PINECONE_API_KEY)
-        self.index_name = "agentic-bi-documents"
-        
-        # Create index if it doesn't exist
-        self._ensure_index_exists()
+        # Initialize Pinecone only if API key is available
+        self.pinecone_enabled = PINECONE_API_KEY is not None
+        if self.pinecone_enabled:
+            self.pc = PineconeClient(api_key=PINECONE_API_KEY)
+            self.index_name = "agentic-bi-documents"
+            # Create index if it doesn't exist
+            self._ensure_index_exists()
+        else:
+            print("⚠️  Pinecone integration disabled - API key not configured")
     
     def _ensure_index_exists(self):
         """Ensure Pinecone index exists"""
@@ -101,24 +104,34 @@ class DocumentProcessor:
             # Split into chunks
             chunks = self.text_splitter.split_documents([document])
             
-            # Generate embeddings and add to Pinecone
-            vector_store = Pinecone.from_documents(
-                chunks,
-                self.embeddings,
-                index_name=self.index_name
-            )
-            
-            # Get the vector IDs
-            vector_ids = [chunk.metadata.get("file_id", str(uuid.uuid4())) for chunk in chunks]
-            
-            return {
-                "status": "success",
-                "message": f"Document processed and indexed successfully",
-                "file_id": metadata["file_id"],
-                "chunks_created": len(chunks),
-                "vector_ids": vector_ids,
-                "index_name": self.index_name
-            }
+            # Generate embeddings and add to Pinecone (if enabled)
+            if self.pinecone_enabled:
+                vector_store = Pinecone.from_documents(
+                    chunks,
+                    self.embeddings,
+                    index_name=self.index_name
+                )
+                
+                # Get the vector IDs
+                vector_ids = [chunk.metadata.get("file_id", str(uuid.uuid4())) for chunk in chunks]
+                
+                return {
+                    "status": "success",
+                    "message": f"Document processed and indexed successfully",
+                    "file_id": metadata["file_id"],
+                    "chunks_created": len(chunks),
+                    "vector_ids": vector_ids,
+                    "index_name": self.index_name
+                }
+            else:
+                return {
+                    "status": "success",
+                    "message": f"Document processed (vector indexing disabled)",
+                    "file_id": metadata["file_id"],
+                    "chunks_created": len(chunks),
+                    "vector_ids": [],
+                    "index_name": None
+                }
             
         except Exception as e:
             return {
@@ -139,6 +152,9 @@ class DocumentProcessor:
         Returns:
             List of relevant documents
         """
+        if not self.pinecone_enabled:
+            return []
+            
         try:
             vector_store = Pinecone.from_existing_index(
                 index_name=self.index_name,

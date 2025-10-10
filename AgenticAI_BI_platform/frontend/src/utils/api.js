@@ -1,10 +1,12 @@
+import { API_ENDPOINTS } from '../config/api';
+
 async function fetchAgents() {
-  const response = await fetch('http://192.168.0.18:8000/api/agents');
+  const response = await fetch(API_ENDPOINTS.agents);
   return response.json();
 }
 
 async function fetchData() {
-  const response = await fetch('http://192.168.0.18:8000/api/data');
+  const response = await fetch(API_ENDPOINTS.data);
   return response.json();
 }
 

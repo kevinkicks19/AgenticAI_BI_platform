@@ -13,6 +13,11 @@ RUN npm install
 # Copy frontend source code
 COPY . .
 
+# Set build-time environment variable for production
+# In production, the API will be served from the same origin
+ARG VITE_API_BASE_URL=""
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
 # Build the frontend
 RUN npm run build
 

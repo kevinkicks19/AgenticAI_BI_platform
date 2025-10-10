@@ -1,12 +1,12 @@
 import React, { useRef, useState } from 'react';
+import { API_BASE_URL } from '../config/api';
+import logger from '../utils/logger';
 
 interface SessionChatboxProps {
   sessionId: string | null;
   onFileUpload?: (document: any) => void;
   onSendMessage?: (message: string) => void;
 }
-
-const API_BASE_URL = 'http://localhost:5000';
 
 const SessionChatbox: React.FC<SessionChatboxProps> = ({ sessionId, onFileUpload, onSendMessage }) => {
   const [isUploading, setIsUploading] = useState(false);
@@ -36,7 +36,7 @@ const SessionChatbox: React.FC<SessionChatboxProps> = ({ sessionId, onFileUpload
         onFileUpload(data);
       }
     } catch (error) {
-      console.error('Error uploading file:', error);
+      logger.error('Error uploading file:', error);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {

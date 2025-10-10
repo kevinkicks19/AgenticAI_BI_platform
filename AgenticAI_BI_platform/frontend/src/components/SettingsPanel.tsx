@@ -1,5 +1,7 @@
 import { Bell, Database, Palette, RotateCcw, Save, Settings, Shield, User } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../config/api';
+import logger from '../utils/logger';
 
 interface UserPreferences {
   theme: 'light' | 'dark' | 'auto';
@@ -96,7 +98,7 @@ const SettingsPanel: React.FC = () => {
   });
 
   const [systemConfig, setSystemConfig] = useState<SystemConfig>({
-    apiEndpoint: 'http://localhost:5000',
+    apiEndpoint: API_BASE_URL,
     maxFileSize: 10,
     allowedFileTypes: ['pdf', 'docx', 'xlsx', 'csv', 'txt'],
     rateLimiting: {
@@ -171,9 +173,9 @@ const SettingsPanel: React.FC = () => {
       setHasChanges(false);
       
       // Show success message (you could add a toast notification here)
-      console.log('Settings saved successfully');
+      logger.info('Settings saved successfully');
     } catch (error) {
-      console.error('Failed to save settings:', error);
+      logger.error('Failed to save settings:', error);
     } finally {
       setIsSaving(false);
     }

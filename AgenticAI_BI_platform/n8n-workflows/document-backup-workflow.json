@@ -1,0 +1,136 @@
+{
+  "name": "Document Backup & Sync Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "document-backup",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-backup",
+      "name": "Document Backup Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "fileId": "{{ $json.document.file_id }}",
+        "fileName": "{{ $json.document.original_filename }}",
+        "parents": {
+          "parentId": "your-backup-folder-id"
+        },
+        "options": {
+          "description": "Backup from Agentic AI BI Platform - {{ $json.document.upload_time }}"
+        }
+      },
+      "id": "google-drive-backup",
+      "name": "Backup to Google Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [460, 200]
+    },
+    {
+      "parameters": {
+        "resource": "page",
+        "operation": "create",
+        "workspaceId": "{{ $json.affine.workspace_id || 'default-workspace' }}",
+        "title": "Document: {{ $json.document.original_filename }}",
+        "content": "# {{ $json.document.original_filename }}\n\n**Upload Date:** {{ $json.document.upload_time }}\n**Type:** {{ $json.document.document_type }}\n**Category:** {{ $json.document.category }}\n**Tags:** {{ $json.document.tags.join(', ') }}\n\n## Content Preview\n{{ $json.document.extracted_text.substring(0, 500) }}...\n\n## File Information\n- **File ID:** {{ $json.document.file_id }}\n- **Size:** {{ $json.document.file_size }} bytes\n- **Content Type:** {{ $json.document.content_type }}"
+      },
+      "id": "affine-sync",
+      "name": "Sync to Affine Workspace",
+      "type": "n8n-nodes-base.affine",
+      "typeVersion": 1,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "postToChannel",
+        "channel": "#document-notifications",
+        "text": "📄 *New Document Uploaded*\n\n*File:* {{ $json.document.original_filename }}\n*Type:* {{ $json.document.document_type }}\n*Size:* {{ Math.round($json.document.file_size / 1024) }}KB\n*User:* {{ $json.document.user_id }}\n\n✅ Backed up to Google Drive\n✅ Synced to Affine workspace\n\n_Uploaded at {{ $json.document.upload_time }}_"
+      },
+      "id": "slack-notification",
+      "name": "Notify Team on Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"status\": \"success\",\n  \"message\": \"Document backup and sync completed\",\n  \"workflow_id\": \"document-backup\",\n  \"actions_completed\": [\n    \"google_drive_backup\",\n    \"affine_workspace_sync\",\n    \"team_notification\"\n  ]\n}"
+      },
+      "id": "backup-response",
+      "name": "Backup Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Document Backup Webhook": {
+      "main": [
+        [
+          {
+            "node": "Backup to Google Drive",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sync to Affine Workspace", 
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backup to Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Notify Team on Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync to Affine Workspace": {
+      "main": [
+        [
+          {
+            "node": "Notify Team on Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Team on Slack": {
+      "main": [
+        [
+          {
+            "node": "Backup Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "document-backup",
+  "tags": ["document-processing", "backup", "sync", "notifications"]
+}
+

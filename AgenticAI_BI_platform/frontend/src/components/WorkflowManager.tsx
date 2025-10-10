@@ -1,18 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Play, 
-  Search, 
-  FileText, 
-  Database, 
-  TrendingUp, 
-  Users, 
-  Filter,
-  Plus,
-  BookOpen,
-  Save,
-  Eye,
-  Download
+import {
+    Eye,
+    FileText,
+    Filter,
+    Play,
+    Save,
+    Search
 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { API_ENDPOINTS } from '../config/api';
+import logger from '../utils/logger';
 
 interface Workflow {
   id: string;
@@ -159,14 +155,14 @@ const WorkflowManager: React.FC = () => {
         try {
           await saveWorkflowExecutionToAffine(completedExecution, workflow);
         } catch (error) {
-          console.error('Error saving workflow execution to Affine:', error);
+          logger.error('Error saving workflow execution to Affine:', error);
         }
         
         setIsExecuting(false);
       }, 3000);
 
     } catch (error) {
-      console.error('Error executing workflow:', error);
+      logger.error('Error executing workflow:', error);
       setIsExecuting(false);
     }
   };
@@ -175,7 +171,7 @@ const WorkflowManager: React.FC = () => {
     if (!selectedWorkflow) return;
 
     try {
-      const response = await fetch('http://localhost:5000/api/affine/documents/workflow-metadata', {
+      const response = await fetch(API_ENDPOINTS.affineWorkflowMetadata, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -192,25 +188,25 @@ const WorkflowManager: React.FC = () => {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Saved to Affine:', result);
+        logger.debug('Saved to Affine:', result);
         setShowDocumentModal(false);
         // Refresh documents
         fetchAffineDocuments();
       }
     } catch (error) {
-      console.error('Error saving to Affine:', error);
+      logger.error('Error saving to Affine:', error);
     }
   };
 
   const fetchAffineDocuments = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/affine/documents/search?document_type=workflow_metadata&limit=50');
+      const response = await fetch(`${API_ENDPOINTS.affineSearch}?document_type=workflow_metadata&limit=50`);
       if (response.ok) {
         const data = await response.json();
         setAffineDocuments(data.results || []);
       }
     } catch (error) {
-      console.error('Error fetching Affine documents:', error);
+      logger.error('Error fetching Affine documents:', error);
     }
   };
 
@@ -220,7 +216,7 @@ const WorkflowManager: React.FC = () => {
 
   const saveWorkflowExecutionToAffine = async (execution: WorkflowExecution, workflow: Workflow) => {
     try {
-      const response = await fetch('http://localhost:5000/api/affine/documents/workflow-execution', {
+      const response = await fetch(API_ENDPOINTS.affineWorkflowExecution, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -239,10 +235,10 @@ const WorkflowManager: React.FC = () => {
       });
 
       if (response.ok) {
-        console.log('Workflow execution saved to Affine:', await response.json());
+        logger.debug('Workflow execution saved to Affine:', await response.json());
       }
     } catch (error) {
-      console.error('Error saving workflow execution to Affine:', error);
+      logger.error('Error saving workflow execution to Affine:', error);
     }
   };
 

@@ -1,0 +1,114 @@
+{
+  "name": "Document Analysis Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "document-analysis",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-start",
+      "name": "Document Upload Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4",
+        "messages": {
+          "messageType": "multipleMessages",
+          "messages": [
+            {
+              "role": "system",
+              "message": "You are a document analysis AI. Analyze the provided document content and extract key insights, summaries, and business intelligence."
+            },
+            {
+              "role": "user", 
+              "message": "Analyze this document:\n\nTitle: {{ $json.document.original_filename }}\nType: {{ $json.document.document_type }}\nContent: {{ $json.document.extracted_text }}\n\nProvide:\n1. Executive Summary\n2. Key Insights\n3. Action Items\n4. Recommended Tags\n5. Business Impact Assessment"
+            }
+          ]
+        }
+      },
+      "id": "ai-analysis",
+      "name": "AI Document Analysis",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "{{ $json.processing.callback_url || 'https://your-app.onrender.com/api/upload/analysis-callback' }}",
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "{\n  \"file_id\": \"{{ $('Document Upload Webhook').item.json.document.file_id }}\",\n  \"analysis_result\": {{ $json.choices[0].message.content | jsonParse }},\n  \"workflow_id\": \"document-analysis\",\n  \"timestamp\": \"{{ new Date().toISOString() }}\",\n  \"status\": \"completed\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "callback-response",
+      "name": "Send Analysis Back to App",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"status\": \"success\",\n  \"message\": \"Document analysis completed\",\n  \"workflow_id\": \"document-analysis\"\n}"
+      },
+      "id": "webhook-response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Document Upload Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Document Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Document Analysis": {
+      "main": [
+        [
+          {
+            "node": "Send Analysis Back to App",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Analysis Back to App": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "document-analysis",
+  "tags": ["document-processing", "ai-analysis", "business-intelligence"]
+}
+
