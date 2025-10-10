@@ -2,7 +2,7 @@ services:
   - type: web
     name: agentic-ai-bi-platform
     env: docker
-    dockerfilePath: ./AgenticAI_BI_platform/Dockerfile
+    dockerfilePath: ./Dockerfile
     dockerContext: ./AgenticAI_BI_platform
     plan: starter
     region: oregon
