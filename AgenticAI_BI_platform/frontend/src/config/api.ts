@@ -3,6 +3,8 @@
  * Centralized API endpoint configuration that works in both development and production
  */
 
+/// <reference types="vite/client" />
+
 // Get the API base URL from environment variables
 // In production (Render), this will be the same origin as the frontend
 // In development, it will be the local backend server
