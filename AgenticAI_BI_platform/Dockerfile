@@ -1,24 +1,30 @@
 # Multi-stage build for frontend and backend
 FROM node:20-alpine AS frontend-builder
 
-# Set working directory for frontend
+# Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy root package files (frontend is built from root)
 COPY package*.json ./
+COPY vite.config.js ./
+COPY postcss.config.js ./
+COPY tailwind.config.js ./
+COPY tsconfig*.json ./
+COPY eslint.config.js ./
 
-# Install frontend dependencies (use npm install instead of npm ci for better compatibility)
+# Install dependencies
 RUN npm install
 
-# Copy frontend source code
-COPY . .
+# Copy frontend source
+COPY frontend/ ./frontend/
+COPY index.html ./
 
 # Set build-time environment variable for production
 # In production, the API will be served from the same origin
 ARG VITE_API_BASE_URL=""
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-# Build the frontend
+# Build the frontend (outputs to ./dist)
 RUN npm run build
 
 # Backend stage

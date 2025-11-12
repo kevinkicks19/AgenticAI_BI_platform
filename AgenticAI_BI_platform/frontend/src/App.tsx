@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './App.css';
+import AgentChatInterface from './components/AgentChatInterface';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
 import ChatContainerManager from './components/ChatContainerManager';
 import Dashboard from './components/Dashboard';
@@ -16,6 +17,8 @@ function App() {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />;
+      case 'agent-chat':
+        return <AgentChatInterface />;
       case 'ai-coordinator':
         return <ChatContainerManager />;
       case 'workflows':

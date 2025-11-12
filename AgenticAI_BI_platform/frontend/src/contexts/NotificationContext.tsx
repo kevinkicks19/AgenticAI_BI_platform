@@ -45,7 +45,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
     }
 
     // Show browser notification if permission is granted
-    if ('Notification' in window && Notification.permission === 'granted') {
+    if ('Notification' in window && window.Notification.permission === 'granted') {
       new window.Notification(notification.title, {
         body: notification.message,
         icon: '/favicon.ico',

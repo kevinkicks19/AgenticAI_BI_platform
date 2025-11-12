@@ -7,16 +7,16 @@ import prioritization_manager
 import json
 import os
 from datetime import datetime
-from approval_routes import router as approval_router
+from routes.approval_routes import router as approval_router
 # Import the enhanced agent coordinator with DataHub integration
 from enhanced_agent_coordinator import EnhancedAgentCoordinator
 
 # Create enhanced agent coordinator instance
 agent_coordinator = EnhancedAgentCoordinator()
-from handoff_routes import router as handoff_router
+from routes.handoff_routes import router as handoff_router
 
 # Import guardrails manager
-from guardrails import guardrails_manager
+from services.guardrails import guardrails_manager
 
 app = FastAPI(title="AgenticAI BI Platform")
 
@@ -51,15 +51,15 @@ else:
 app.include_router(approval_router, prefix="/api/approval")
 
 # Import and include Affine routes
-from affine_routes import router as affine_router
+from routes.affine_routes import router as affine_router
 app.include_router(affine_router)
 
 # Import and include file upload routes
-from file_upload_routes import router as upload_router
+from routes.file_upload_routes import router as upload_router
 app.include_router(upload_router)
 
 # Import Affine service for inception documents
-from affine_service import affine_service
+from services.affine_service import affine_service
 
 # Chat API routes using the real agent coordinator
 @app.post("/api/chat")
@@ -138,6 +138,87 @@ async def get_available_workflows():
             "workflow_registry": {},
             "total_n8n_workflows": 0
         }
+
+@app.get("/api/agents/list")
+async def list_agents():
+    """Get list of AI agents (n8n workflows configured as agents)"""
+    try:
+        # Static agent configuration based on known active workflows
+        # This maps your n8n workflows to agent metadata
+        agents = [
+            {
+                "id": "2WcHPWj1Go1hH7Af",
+                "name": "DVadvisor",
+                "description": "Data Vault Business Intelligence advisor with embedded knowledge to assist data vault users.",
+                "type": "advisor",
+                "webhookUrl": "https://bmccartn.app.n8n.cloud/webhook/18cd40ef-c9a1-41db-a401-9aef136b9768",
+                "icon": "📊",
+                "active": True,
+                "tags": ["data-vault", "bi", "analytics"],
+                "capabilities": ["Data vault modeling", "ERD generation", "Best practices guidance"]
+            },
+            {
+                "id": "V59ZdxTNusKy1Swt",
+                "name": "HAadvisor",
+                "description": "Home Automation advisor combining home automation and data vault knowledge.",
+                "type": "advisor",
+                "webhookUrl": "https://bmccartn.app.n8n.cloud/webhook/ca361862-55b2-49a0-a765-ff06b90e416a",
+                "icon": "🏠",
+                "active": True,
+                "tags": ["home-automation", "iot", "smart-home"],
+                "capabilities": ["Home automation setup", "Device integration", "Automation workflows"]
+            },
+            {
+                "id": "3Qm6jbbc8jhlZayR",
+                "name": "Business Inception Agent",
+                "description": "Interactive assistant for gathering business requirements and creating inception documents.",
+                "type": "creator",
+                "webhookUrl": "https://bmccartn.app.n8n.cloud/webhook/1269a389-347f-44ae-918e-840c26918584",
+                "icon": "💼",
+                "active": True,
+                "tags": ["business-analysis", "requirements", "documentation"],
+                "capabilities": ["Requirements gathering", "Document creation", "Stakeholder analysis"]
+            },
+            {
+                "id": "ge9ANfdpN8yOu2hv",
+                "name": "Metadata Object Creator",
+                "description": "Creates and manages business metadata objects like CBEs, stories, and glossaries.",
+                "type": "creator",
+                "webhookUrl": "https://bmccartn.app.n8n.cloud/webhook-test/create-metadata-object",
+                "icon": "📝",
+                "active": False,
+                "tags": ["metadata", "documentation", "business-concepts"],
+                "capabilities": ["CBE creation", "Story management", "Glossary terms"]
+            },
+            {
+                "id": "yRvfRLH3i8L5ZSgf",
+                "name": "YouTube Content Analyzer",
+                "description": "Analyzes YouTube videos for summaries, transcripts, timestamps, and shareable clips.",
+                "type": "analyzer",
+                "webhookUrl": "https://bmccartn.app.n8n.cloud/form/92148b0b-bbf7-4ce9-80a2-768207adee7b",
+                "icon": "🎥",
+                "active": False,
+                "tags": ["content-analysis", "video", "youtube"],
+                "capabilities": ["Video transcription", "Content summarization", "Clip extraction"]
+            }
+        ]
+        
+        return {
+            "status": "success",
+            "agents": agents,
+            "total": len(agents),
+            "active": len([a for a in agents if a["active"]])
+        }
+    except Exception as e:
+        print(f"Error listing agents: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": str(e),
+                "agents": []
+            }
+        )
 
 # Mount the handoff routes
 app.include_router(handoff_router)

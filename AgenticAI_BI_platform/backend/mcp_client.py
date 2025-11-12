@@ -6,7 +6,11 @@ from config import N8N_API_URL, N8N_API_KEY
 
 class N8nMCPClient:
     """
-    MCP Client for n8n integration that provides the same tools as the MCP server
+    MCP-style Client for n8n integration that mirrors the MCP server tools.
+    
+    This client provides the same functionality as the n8n MCP server tools
+    but uses direct HTTP API calls. This is the recommended approach for Python
+    backends since MCP tools are only accessible to AI assistants.
     """
     
     def __init__(self):
@@ -19,8 +23,12 @@ class N8nMCPClient:
         # Set up headers for n8n API calls
         self.headers = {
             'X-N8N-API-KEY': self.n8n_api_key,
-            'Content-Type': 'application/json'
-        } if self.n8n_api_key else {'Content-Type': 'application/json'}
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        } if self.n8n_api_key else {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
         
     def list_workflows(self) -> Dict[str, Any]:
         """List available n8n workflows using MCP tools"""
@@ -257,6 +265,190 @@ class N8nMCPClient:
             }
         except Exception as e:
             return {"status": "error", "message": str(e)}
+    
+    def activate_workflow(self, workflow_id: str) -> Dict[str, Any]:
+        """Activate a workflow (mirrors mcp_n8n-mcp_n8n_update_full_workflow with active=true)"""
+        try:
+            url = f"{self.n8n_api_url}/api/v1/workflows/{workflow_id}"
+            response = requests.patch(
+                url, 
+                headers=self.headers, 
+                json={"active": True},
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                return {
+                    "status": "success",
+                    "message": f"Workflow {workflow_id} activated successfully",
+                    "workflow": response.json()
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to activate workflow: {response.status_code}",
+                    "response_text": response.text
+                }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+    
+    def deactivate_workflow(self, workflow_id: str) -> Dict[str, Any]:
+        """Deactivate a workflow"""
+        try:
+            url = f"{self.n8n_api_url}/api/v1/workflows/{workflow_id}"
+            response = requests.patch(
+                url, 
+                headers=self.headers, 
+                json={"active": False},
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                return {
+                    "status": "success",
+                    "message": f"Workflow {workflow_id} deactivated successfully",
+                    "workflow": response.json()
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to deactivate workflow: {response.status_code}",
+                    "response_text": response.text
+                }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+    
+    def delete_workflow(self, workflow_id: str) -> Dict[str, Any]:
+        """Delete a workflow (mirrors mcp_n8n-mcp_n8n_delete_workflow)"""
+        try:
+            url = f"{self.n8n_api_url}/api/v1/workflows/{workflow_id}"
+            response = requests.delete(url, headers=self.headers, timeout=10)
+            
+            if response.status_code == 200:
+                return {
+                    "status": "success",
+                    "message": f"Workflow {workflow_id} deleted successfully"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to delete workflow: {response.status_code}",
+                    "response_text": response.text
+                }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+    
+    def get_execution(self, execution_id: str, include_data: bool = False) -> Dict[str, Any]:
+        """Get execution details (mirrors mcp_n8n-mcp_n8n_get_execution)"""
+        try:
+            url = f"{self.n8n_api_url}/api/v1/executions/{execution_id}"
+            params = {"includeData": "true" if include_data else "false"}
+            response = requests.get(url, headers=self.headers, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                return {
+                    "status": "success",
+                    "execution": response.json()
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to get execution: {response.status_code}",
+                    "response_text": response.text
+                }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+    
+    def list_executions(self, 
+                       workflow_id: Optional[str] = None,
+                       status: Optional[str] = None,
+                       limit: int = 100) -> Dict[str, Any]:
+        """List workflow executions (mirrors mcp_n8n-mcp_n8n_list_executions)"""
+        try:
+            url = f"{self.n8n_api_url}/api/v1/executions"
+            params = {"limit": limit}
+            
+            if workflow_id:
+                params["workflowId"] = workflow_id
+            if status:
+                params["status"] = status
+                
+            response = requests.get(url, headers=self.headers, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "status": "success",
+                    "executions": data.get("data", []),
+                    "count": len(data.get("data", []))
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to list executions: {response.status_code}",
+                    "response_text": response.text,
+                    "executions": []
+                }
+        except Exception as e:
+            return {"status": "error", "message": str(e), "executions": []}
+    
+    def health_check(self) -> Dict[str, Any]:
+        """Check n8n instance health (mirrors mcp_n8n-mcp_n8n_health_check)"""
+        try:
+            # Try to list workflows as a health check
+            result = self.list_workflows()
+            
+            if result.get("status") == "success":
+                return {
+                    "status": "healthy",
+                    "message": "n8n instance is accessible and responding",
+                    "api_url": self.n8n_api_url,
+                    "workflows_count": result.get("total_count", 0)
+                }
+            else:
+                return {
+                    "status": "unhealthy",
+                    "message": "n8n instance is not responding properly",
+                    "api_url": self.n8n_api_url,
+                    "error": result.get("message")
+                }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "message": f"Cannot reach n8n instance: {str(e)}",
+                "api_url": self.n8n_api_url
+            }
 
 # Create a global MCP client instance
-mcp_client = N8nMCPClient() 
+mcp_client = N8nMCPClient()
+
+# Convenience functions that mirror MCP tool usage
+def n8n_list_workflows(**kwargs):
+    """Convenience function that mirrors mcp_n8n-mcp_n8n_list_workflows"""
+    return mcp_client.list_workflows()
+
+def n8n_get_workflow(workflow_id: str):
+    """Convenience function that mirrors mcp_n8n-mcp_n8n_get_workflow"""
+    return mcp_client.get_workflow(workflow_id)
+
+def n8n_trigger_webhook(webhook_url: str, data: Dict[str, Any]):
+    """Convenience function that mirrors mcp_n8n-mcp_n8n_trigger_webhook_workflow"""
+    return mcp_client.trigger_webhook_workflow(webhook_url, data)
+
+def n8n_create_workflow(name: str, nodes: List, connections: Dict, **kwargs):
+    """Convenience function that mirrors mcp_n8n-mcp_n8n_create_workflow"""
+    workflow_data = {
+        "name": name,
+        "nodes": nodes,
+        "connections": connections,
+        **kwargs
+    }
+    return mcp_client.create_workflow(workflow_data)
+
+def n8n_validate_workflow(workflow_id: str):
+    """Convenience function that mirrors mcp_n8n-mcp_n8n_validate_workflow"""
+    return mcp_client.validate_workflow({"id": workflow_id})
+
+def n8n_health_check():
+    """Convenience function that mirrors mcp_n8n-mcp_n8n_health_check"""
+    return mcp_client.health_check() 

@@ -25,13 +25,13 @@ from models import (
 )
 
 # Import existing routes
-from approval_routes import router as approval_router
+from routes.approval_routes import router as approval_router
 from enhanced_agent_coordinator import EnhancedAgentCoordinator
-from handoff_routes import router as handoff_router
-from guardrails import guardrails_manager
+from routes.handoff_routes import router as handoff_router
+from services.guardrails import guardrails_manager
 from affine_routes import router as affine_router
-from file_upload_routes import router as upload_router
-from affine_service import affine_service
+from routes.file_upload_routes import router as upload_router
+from services.affine_service import affine_service
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

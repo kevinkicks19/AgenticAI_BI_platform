@@ -1,4 +1,4 @@
-import { BarChart3, Bot, FileText, Settings, TrendingUp, Workflow } from 'lucide-react';
+import { BarChart3, Bot, FileText, MessageCircle, Settings, TrendingUp, Workflow } from 'lucide-react';
 import React from 'react';
 import NotificationBell from './NotificationBell';
 
@@ -14,6 +14,12 @@ const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
       label: 'Dashboard',
       icon: BarChart3,
       description: 'Overview of system metrics and activity'
+    },
+    {
+      id: 'agent-chat',
+      label: 'Agent Chat',
+      icon: MessageCircle,
+      description: 'Chat with specialized AI agents'
     },
     {
       id: 'ai-coordinator',

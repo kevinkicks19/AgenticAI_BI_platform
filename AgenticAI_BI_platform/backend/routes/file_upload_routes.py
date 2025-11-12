@@ -378,7 +378,7 @@ async def create_affine_document(file_id: str, request: Request):
         )
         
         # Import Affine service
-        from affine_service import affine_service
+        from services.affine_service import affine_service
         
         # Create document in Affine
         result = await affine_service.create_document({

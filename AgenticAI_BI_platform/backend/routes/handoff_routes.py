@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request, Body
-from handoff_manager import handoff_manager
+from services.handoff_manager import handoff_manager
 from agent_coordinator import coordinator
 from datetime import datetime
 import requests

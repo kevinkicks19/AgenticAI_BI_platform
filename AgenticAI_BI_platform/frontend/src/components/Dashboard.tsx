@@ -1,313 +1,221 @@
 import React, { useState, useEffect } from 'react';
-import NotificationDemo from './NotificationDemo';
+import axios from 'axios';
 
-interface MetricCard {
-  title: string;
-  value: string | number;
-  change: string;
-  changeType: 'positive' | 'negative' | 'neutral';
-  icon: string;
-  description: string;
-}
-
-interface WorkflowStatus {
+interface WorkflowSummary {
   id: string;
   name: string;
-  status: 'active' | 'inactive' | 'running' | 'error';
-  lastRun: string;
-  successRate: number;
+  active: boolean;
+  nodeCount: number;
+  updatedAt: string;
+  tags: string[];
 }
 
-interface RecentActivity {
+interface Agent {
   id: string;
-  type: 'workflow' | 'document' | 'chat' | 'system';
-  message: string;
-  timestamp: string;
-  status: 'success' | 'warning' | 'error' | 'info';
+  name: string;
+  icon: string;
+  active: boolean;
+  type: string;
 }
 
 const Dashboard: React.FC = () => {
-  const [metrics, setMetrics] = useState<MetricCard[]>([
-    {
-      title: 'Active Workflows',
-      value: 12,
-      change: '+2 this week',
-      changeType: 'positive',
-      icon: '⚡',
-      description: 'Currently running workflows'
-    },
-    {
-      title: 'Documents Processed',
-      value: 1,247,
-      change: '+15% from last month',
-      changeType: 'positive',
-      icon: '📄',
-      description: 'Total documents analyzed'
-    },
-    {
-      title: 'Chat Sessions',
-      value: 89,
-      change: '+23 this week',
-      changeType: 'positive',
-      icon: '💬',
-      description: 'Active chat sessions'
-    },
-    {
-      title: 'Success Rate',
-      value: '94.2%',
-      change: '+1.2% from last week',
-      changeType: 'positive',
-      icon: '✅',
-      description: 'Workflow execution success rate'
-    }
-  ]);
+  const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalWorkflows: 0,
+    activeWorkflows: 0,
+    activeAgents: 0
+  });
 
-  const [workflowStatuses, setWorkflowStatuses] = useState<WorkflowStatus[]>([
-    {
-      id: '1',
-      name: 'Data Analysis Pipeline',
-      status: 'running',
-      lastRun: '2 minutes ago',
-      successRate: 96.5
-    },
-    {
-      id: '2',
-      name: 'Document Processing',
-      status: 'active',
-      lastRun: '15 minutes ago',
-      successRate: 98.2
-    },
-    {
-      id: '3',
-      name: 'Report Generation',
-      status: 'active',
-      lastRun: '1 hour ago',
-      successRate: 92.1
-    },
-    {
-      id: '4',
-      name: 'Data Validation',
-      status: 'error',
-      lastRun: '3 hours ago',
-      successRate: 87.3
-    }
-  ]);
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([
-    {
-      id: '1',
-      type: 'workflow',
-      message: 'Data Analysis Pipeline completed successfully',
-      timestamp: '2 minutes ago',
-      status: 'success'
-    },
-    {
-      id: '2',
-      type: 'document',
-      message: 'New document uploaded: Q4_Financial_Report.pdf',
-      timestamp: '15 minutes ago',
-      status: 'info'
-    },
-    {
-      id: '3',
-      type: 'chat',
-      message: 'User requested data visualization for sales metrics',
-      timestamp: '1 hour ago',
-      status: 'success'
-    },
-    {
-      id: '4',
-      type: 'system',
-      message: 'Data Validation workflow encountered an error',
-      timestamp: '3 hours ago',
-      status: 'error'
-    },
-    {
-      id: '5',
-      type: 'workflow',
-      message: 'Report Generation workflow started',
-      timestamp: '4 hours ago',
-      status: 'info'
-    }
-  ]);
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      // Load agents
+      const agentsResponse = await axios.get('http://localhost:5000/api/agents/list');
+      const agentsList = agentsResponse.data.agents || [];
+      setAgents(agentsList);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-      case 'running':
-      case 'success':
-        return 'text-green-600 bg-green-100';
-      case 'inactive':
-      case 'info':
-        return 'text-blue-600 bg-blue-100';
-      case 'error':
-        return 'text-red-600 bg-red-100';
-      case 'warning':
-        return 'text-yellow-600 bg-yellow-100';
-      default:
-        return 'text-gray-600 bg-gray-100';
+      // For now, we'll use a simplified workflow list
+      // In the future, this could call the n8n MCP to get real workflow data
+      const activeWorkflows = agentsList.filter((a: Agent) => a.active);
+      
+      setStats({
+        totalWorkflows: agentsList.length,
+        activeWorkflows: activeWorkflows.length,
+        activeAgents: activeWorkflows.length
+      });
+
+      setWorkflows(agentsList.map((agent: Agent) => ({
+        id: agent.id,
+        name: agent.name,
+        active: agent.active,
+        nodeCount: 0, // This would come from n8n MCP
+        updatedAt: 'Recently',
+        tags: [agent.type]
+      })));
+
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active':
-      case 'running':
-        return '🟢';
-      case 'inactive':
-        return '⚪';
-      case 'error':
-        return '🔴';
-      case 'success':
-        return '✅';
-      case 'warning':
-        return '⚠️';
-      case 'info':
-        return 'ℹ️';
-      default:
-        return '⚪';
-    }
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'workflow':
-        return '⚡';
-      case 'document':
-        return '📄';
-      case 'chat':
-        return '💬';
-      case 'system':
-        return '🔧';
-      default:
-        return '📋';
-    }
-  };
+  if (loading) {
+    return (
+      <div className="p-6 bg-gray-50 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4">⏳</div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Agentic AI BI Platform Dashboard
+          Dashboard
         </h1>
         <p className="text-gray-600">
-          Monitor your AI workflows, analyze performance, and track system activity
+          Overview of your n8n workflows and AI agents
         </p>
       </div>
 
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {metrics.map((metric, index) => (
-          <div
-            key={index}
-            className="bg-white rounded-lg shadow-md p-6 border border-gray-200 hover:shadow-lg transition-shadow"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-2xl">{metric.icon}</div>
-              <div className={`text-sm font-medium ${
-                metric.changeType === 'positive' ? 'text-green-600' :
-                metric.changeType === 'negative' ? 'text-red-600' : 'text-gray-600'
-              }`}>
-                {metric.change}
-              </div>
-            </div>
-            <div className="mb-2">
-              <h3 className="text-2xl font-bold text-gray-900">{metric.value}</h3>
-              <p className="text-sm text-gray-600">{metric.title}</p>
-            </div>
-            <p className="text-xs text-gray-500">{metric.description}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Workflow Status */}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900">Workflow Status</h2>
-            <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-              View All
-            </button>
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-3xl">⚡</div>
+            <div className="text-2xl font-bold text-gray-900">{stats.totalWorkflows}</div>
           </div>
-          <div className="space-y-4">
-            {workflowStatuses.map((workflow) => (
-              <div
-                key={workflow.id}
-                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <span className="text-lg">{getStatusIcon(workflow.status)}</span>
-                  <div>
-                    <h3 className="font-medium text-gray-900">{workflow.name}</h3>
-                    <p className="text-sm text-gray-600">Last run: {workflow.lastRun}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(workflow.status)}`}>
-                    {workflow.status}
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {workflow.successRate}% success
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <h3 className="text-sm text-gray-600 font-medium">Total Workflows</h3>
+          <p className="text-xs text-gray-500 mt-1">Configured n8n workflows</p>
         </div>
 
-        {/* Recent Activity */}
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900">Recent Activity</h2>
-            <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-              View All
-            </button>
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-3xl">🟢</div>
+            <div className="text-2xl font-bold text-green-600">{stats.activeWorkflows}</div>
           </div>
-          <div className="space-y-4">
-            {recentActivity.map((activity) => (
-              <div
-                key={activity.id}
-                className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <span className="text-lg mt-0.5">{getTypeIcon(activity.type)}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-900">{activity.message}</p>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-gray-500">{activity.timestamp}</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(activity.status)}`}>
-                      {activity.status}
-                    </span>
+          <h3 className="text-sm text-gray-600 font-medium">Active Workflows</h3>
+          <p className="text-xs text-gray-500 mt-1">Currently available</p>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-3xl">🤖</div>
+            <div className="text-2xl font-bold text-blue-600">{stats.activeAgents}</div>
+          </div>
+          <h3 className="text-sm text-gray-600 font-medium">Active Agents</h3>
+          <p className="text-xs text-gray-500 mt-1">Ready to assist</p>
+        </div>
+      </div>
+
+      {/* Workflow/Agent List */}
+      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200 mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-900">AI Agents & Workflows</h2>
+          <button 
+            onClick={loadDashboardData}
+            className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center gap-2"
+          >
+            <span>🔄</span> Refresh
+          </button>
+        </div>
+        
+        <div className="space-y-3">
+          {workflows.map((workflow) => (
+            <div
+              key={workflow.id}
+              className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200"
+            >
+              <div className="flex items-center space-x-4">
+                <div className="text-2xl">
+                  {agents.find(a => a.id === workflow.id)?.icon || '⚡'}
+                </div>
+                <div>
+                  <h3 className="font-medium text-gray-900">{workflow.name}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    {workflow.tags.map((tag, idx) => (
+                      <span key={idx} className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                        {tag}
+                      </span>
+                    ))}
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+              <div className="text-right">
+                <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                  workflow.active 
+                    ? 'bg-green-100 text-green-700' 
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {workflow.active ? '🟢 Active' : '⚪ Inactive'}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="mt-8 bg-white rounded-lg shadow-md p-6 border border-gray-200">
+      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
         <h2 className="text-xl font-semibold text-gray-900 mb-6">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="flex items-center justify-center space-x-2 p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200">
-            <span className="text-2xl">⚡</span>
-            <span className="font-medium text-blue-900">Start New Workflow</span>
-          </button>
-          <button className="flex items-center justify-center space-x-2 p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200">
-            <span className="text-2xl">📄</span>
-            <span className="font-medium text-green-900">Upload Document</span>
-          </button>
-          <button className="flex items-center justify-center space-x-2 p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors border border-purple-200">
+          <button 
+            onClick={() => window.location.hash = '#agent-chat'}
+            className="flex items-center justify-center space-x-2 p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200"
+          >
             <span className="text-2xl">💬</span>
-            <span className="font-medium text-purple-900">New Chat Session</span>
+            <span className="font-medium text-blue-900">Chat with Agents</span>
+          </button>
+          
+          <button 
+            onClick={() => window.location.hash = '#workflows'}
+            className="flex items-center justify-center space-x-2 p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors border border-purple-200"
+          >
+            <span className="text-2xl">⚙️</span>
+            <span className="font-medium text-purple-900">Manage Workflows</span>
+          </button>
+          
+          <button 
+            onClick={() => window.location.hash = '#documents'}
+            className="flex items-center justify-center space-x-2 p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
+          >
+            <span className="text-2xl">📄</span>
+            <span className="font-medium text-green-900">View Documents</span>
           </button>
         </div>
       </div>
 
-      {/* Notification System Demo */}
-      <div className="mt-8">
-        <NotificationDemo />
+      {/* Info Card */}
+      <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <div className="flex items-start gap-3">
+          <div className="text-2xl">ℹ️</div>
+          <div>
+            <h3 className="font-semibold text-blue-900 mb-2">About This Dashboard</h3>
+            <p className="text-sm text-blue-800">
+              This dashboard shows real data from your n8n workflows. The agents listed above are powered by 
+              n8n workflows with AI capabilities, RAG (Retrieval Augmented Generation), and custom integrations.
+            </p>
+            <div className="mt-3 text-sm text-blue-700">
+              <strong>Active Agents:</strong>
+              <ul className="list-disc list-inside mt-1 space-y-1">
+                {agents.filter(a => a.active).map(agent => (
+                  <li key={agent.id}>{agent.icon} {agent.name}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

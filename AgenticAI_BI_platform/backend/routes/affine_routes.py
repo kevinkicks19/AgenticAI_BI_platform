@@ -12,7 +12,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
 from typing import Dict, List, Any, Optional
 import json
-from affine_service import affine_service
+from services.affine_service import affine_service
 from datetime import datetime
 
 router = APIRouter(prefix="/api/affine", tags=["affine"])

@@ -249,7 +249,7 @@ const EnhancedChat: React.FC = () => {
       
       const data = await response.json();
       
-      if (data.status === 'success' || data.status === 'handoff' || data.status === 'guardrail_violation') {
+      if (data.status === 'success' || data.status === 'handoff' || data.status === 'guardrail_violation' || data.status === 'guidance_provided') {
         const assistantMessage: Message = {
           role: 'assistant',
           content: data.response,
