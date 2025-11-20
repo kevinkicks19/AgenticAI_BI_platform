@@ -1,9 +1,12 @@
+# Production Docker Compose
+# Usage: docker-compose -f docker-compose.prod.yml up --build
+
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: agentic-bi-backend
+    container_name: agentic-bi-backend-prod
     ports:
       - "5000:5000"
     environment:
@@ -12,62 +15,65 @@ services:
       - N8N_API_KEY=${N8N_API_KEY}
       - N8N_API_URL=${N8N_API_URL:-https://n8n.casamccartney.link}
       - PINECONE_API_KEY=${PINECONE_API_KEY}
-      - REDIS_URL=${REDIS_URL:-redis://localhost:6379}
-      - DATAHUB_API_URL=${DATAHUB_API_URL:-http://localhost:8080}
+      - REDIS_URL=${REDIS_URL}
+      - DATAHUB_API_URL=${DATAHUB_API_URL}
       - DATAHUB_API_TOKEN=${DATAHUB_API_TOKEN}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - GITHUB_OWNER=${GITHUB_OWNER}
       - HOST=0.0.0.0
       - PORT=5000
-      - DEBUG=${DEBUG:-False}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=False
+      - ENVIRONMENT=production
+      - PYTHONUNBUFFERED=1
     volumes:
-      - ./backend:/app
       - backend-uploads:/app/uploads
+      - backend-static:/app/static
     restart: unless-stopped
     networks:
       - app-network
+    command: uvicorn app:app --host 0.0.0.0 --port 5000 --workers 4
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/upload/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
 
   frontend:
     build:
       context: .
-      dockerfile: frontend/Dockerfile
-    container_name: agentic-bi-frontend
+      dockerfile: frontend/Dockerfile.prod
+    container_name: agentic-bi-frontend-prod
     ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app/frontend
-      - ./package.json:/app/package.json
-      - ./package-lock.json:/app/package-lock.json
-      - ./vite.config.js:/app/vite.config.js
-      - ./postcss.config.js:/app/postcss.config.js
-      - ./tailwind.config.js:/app/tailwind.config.js
-      - ./tsconfig.json:/app/tsconfig.json
-      - ./tsconfig.app.json:/app/tsconfig.app.json
-      - ./tsconfig.node.json:/app/tsconfig.node.json
-      - ./eslint.config.js:/app/eslint.config.js
-      - ./index.html:/app/index.html
-      - frontend-node-modules:/app/node_modules
+      - "80:80"
     environment:
       - VITE_API_BASE_URL=http://backend:5000
-      - NODE_ENV=development
+      - NODE_ENV=production
     depends_on:
       backend:
         condition: service_healthy
     restart: unless-stopped
     networks:
       - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
 
 volumes:
   backend-uploads:
-  frontend-node-modules:
+  backend-static:
 
 networks:
   app-network:
-    driver: bridge 
+    driver: bridge
+
