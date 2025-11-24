@@ -1,0 +1,79 @@
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+venv_new/
+env/
+ENV/
+.venv
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Uploads (created at runtime)
+uploads/*
+!uploads/.gitkeep
+
+# Logs
+*.log
+logs/
+
+# Tests
+test_*.py
+*_test.py
+tests/
+pytest.ini
+
+# Frontend (not needed in backend container)
+frontend/
+../frontend/
+
+# Static files (will be created at runtime)
+static/*
+!static/.gitkeep
+
+# Large files and artifacts
+*.pkl
+*.joblib
+*.h5
+*.model
+pca_*.joblib
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Node (in case any gets copied)
+node_modules/
+package*.json
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+

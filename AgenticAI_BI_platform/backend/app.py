@@ -58,6 +58,14 @@ app.include_router(affine_router)
 from routes.file_upload_routes import router as upload_router
 app.include_router(upload_router)
 
+# Import and include GitHub artifact routes
+from routes.github_artifact_routes import router as github_router
+app.include_router(github_router)
+
+# Import and include session routes
+from routes.session_routes import router as session_router
+app.include_router(session_router)
+
 # Import Affine service for inception documents
 from services.affine_service import affine_service
 

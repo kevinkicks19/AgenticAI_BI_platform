@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import 'highlight.js/styles/github-dark.css';
 
 interface Agent {
   id: string;
@@ -41,15 +45,96 @@ const AgentChatInterface: React.FC = () => {
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Load agents from n8n workflows
+  // Load agents and sessions from backend
   useEffect(() => {
     loadAgents();
+    loadSessions();
   }, []);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [currentSession?.messages]);
+
+  const loadSessions = async () => {
+    try {
+      const response = await axios.get('http://localhost:5000/api/sessions?limit=20');
+      const savedSessions = response.data.sessions || [];
+      
+      if (savedSessions.length === 0) {
+        return; // No sessions to restore
+      }
+      
+      // Convert saved sessions to ConversationSession format
+      const restoredSessions: ConversationSession[] = await Promise.all(
+        savedSessions.map(async (saved: any) => {
+          // Fetch full session data
+          try {
+            const sessionResponse = await axios.get(`http://localhost:5000/api/sessions/${saved.sessionId}`);
+            const fullSession = sessionResponse.data.session;
+            
+            // Convert messages timestamps from strings to Date objects
+            const messages: Message[] = fullSession.messages.map((msg: any) => ({
+              id: msg.id,
+              role: msg.role as 'user' | 'assistant' | 'system',
+              content: msg.content,
+              timestamp: new Date(msg.timestamp),
+              agentId: msg.agentId,
+              agentName: msg.agentName
+            }));
+            
+            return {
+              sessionId: fullSession.sessionId,
+              agentId: fullSession.agentId,
+              agentName: fullSession.agentName,
+              messages,
+              startTime: new Date(fullSession.startTime),
+              lastActivity: new Date(fullSession.lastActivity)
+            };
+          } catch (error) {
+            console.error(`Error loading session ${saved.sessionId}:`, error);
+            return null;
+          }
+        })
+      );
+      
+      // Filter out nulls and set sessions
+      const validSessions = restoredSessions.filter(s => s !== null) as ConversationSession[];
+      if (validSessions.length > 0) {
+        setSessions(validSessions);
+        // Don't auto-restore the session - let user choose
+      }
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+      // Continue without restored sessions
+    }
+  };
+
+  const saveSession = async (session: ConversationSession) => {
+    try {
+      // Convert session to API format
+      const sessionData = {
+        sessionId: session.sessionId,
+        agentId: session.agentId,
+        agentName: session.agentName,
+        messages: session.messages.map(msg => ({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp.toISOString(),
+          agentId: msg.agentId,
+          agentName: msg.agentName
+        })),
+        startTime: session.startTime.toISOString(),
+        lastActivity: session.lastActivity.toISOString()
+      };
+      
+      await axios.post('http://localhost:5000/api/sessions', sessionData);
+    } catch (error) {
+      console.error('Error saving session:', error);
+      // Don't throw - session saving is best effort
+    }
+  };
 
   const loadAgents = async () => {
     setIsLoading(true);
@@ -142,6 +227,9 @@ const AgentChatInterface: React.FC = () => {
     setSessions(prev => [...prev, newSession]);
     setCurrentSession(newSession);
     setSelectedAgent(agent);
+    
+    // Save session to backend
+    saveSession(newSession);
   };
 
   const sendMessage = async () => {
@@ -198,6 +286,9 @@ const AgentChatInterface: React.FC = () => {
 
       setCurrentSession(finalSession);
       setSessions(prev => prev.map(s => s.sessionId === currentSession.sessionId ? finalSession : s));
+      
+      // Save updated session to backend
+      saveSession(finalSession);
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -218,6 +309,9 @@ const AgentChatInterface: React.FC = () => {
 
       setCurrentSession(errorSession);
       setSessions(prev => prev.map(s => s.sessionId === currentSession.sessionId ? errorSession : s));
+      
+      // Save error session state
+      saveSession(errorSession);
     } finally {
       setIsSending(false);
     }
@@ -231,7 +325,15 @@ const AgentChatInterface: React.FC = () => {
     }
   };
 
-  const closeSession = (sessionId: string) => {
+  const closeSession = async (sessionId: string) => {
+    // Delete from backend
+    try {
+      await axios.delete(`http://localhost:5000/api/sessions/${sessionId}`);
+    } catch (error) {
+      console.error('Error deleting session from backend:', error);
+    }
+    
+    // Remove from local state
     setSessions(prev => prev.filter(s => s.sessionId !== sessionId));
     if (currentSession?.sessionId === sessionId) {
       setCurrentSession(null);
@@ -394,7 +496,51 @@ const AgentChatInterface: React.FC = () => {
                         <span className="font-medium">{selectedAgent.name}</span>
                       </div>
                     )}
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    {msg.role === 'assistant' ? (
+                      <div className="prose prose-sm max-w-none dark:prose-invert">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeHighlight]}
+                          components={{
+                            code: ({ node, inline, className, children, ...props }: any) => {
+                              const match = /language-(\w+)/.exec(className || '');
+                              return !inline && match ? (
+                                <pre className="bg-gray-900 text-gray-100 rounded p-3 overflow-x-auto">
+                                  <code className={className} {...props}>
+                                    {children}
+                                  </code>
+                                </pre>
+                              ) : (
+                                <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm" {...props}>
+                                  {children}
+                                </code>
+                              );
+                            },
+                            table: ({ children }: any) => (
+                              <div className="overflow-x-auto my-4">
+                                <table className="min-w-full border-collapse border border-gray-300">
+                                  {children}
+                                </table>
+                              </div>
+                            ),
+                            th: ({ children }: any) => (
+                              <th className="border border-gray-300 bg-gray-100 px-4 py-2 text-left font-semibold">
+                                {children}
+                              </th>
+                            ),
+                            td: ({ children }: any) => (
+                              <td className="border border-gray-300 px-4 py-2">
+                                {children}
+                              </td>
+                            ),
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <div className="whitespace-pre-wrap">{msg.content}</div>
+                    )}
                     <div className={`text-xs mt-2 ${msg.role === 'user' ? 'text-blue-100' : 'text-gray-400'}`}>
                       {msg.timestamp.toLocaleTimeString()}
                     </div>
