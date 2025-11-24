@@ -1,6 +1,5 @@
-import { BarChart3, Bot, FileText, MessageCircle, Settings, TrendingUp, Workflow } from 'lucide-react';
+import { FileText, MessageCircle } from 'lucide-react';
 import React from 'react';
-import NotificationBell from './NotificationBell';
 
 interface NavigationProps {
   activeTab: string;
@@ -10,55 +9,24 @@ interface NavigationProps {
 const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }) => {
   const navItems = [
     {
-      id: 'dashboard',
-      label: 'Dashboard',
-      icon: BarChart3,
-      description: 'Overview of system metrics and activity'
-    },
-    {
       id: 'agent-chat',
       label: 'Agent Chat',
       icon: MessageCircle,
-      description: 'Chat with specialized AI agents'
-    },
-    {
-      id: 'ai-coordinator',
-      label: 'AI Coordinator',
-      icon: Bot,
-      description: 'Your main AI business intelligence coordinator'
-    },
-    {
-      id: 'workflows',
-      label: 'Workflows',
-      icon: Workflow,
-      description: 'Manage and monitor n8n workflows'
-    },
-    {
-      id: 'analytics',
-      label: 'Analytics',
-      icon: TrendingUp,
-      description: 'Advanced analytics and data visualization'
+      description: 'Chat with AI agents via n8n'
     },
     {
       id: 'documents',
       label: 'Documents',
       icon: FileText,
-      description: 'Upload and manage Affine documents'
-    },
-    {
-      id: 'settings',
-      label: 'Settings',
-      icon: Settings,
-      description: 'Configure preferences and system settings'
+      description: 'Upload and manage documents'
     }
   ];
 
   return (
     <nav className="w-64 bg-white border-r border-gray-200 p-4 h-screen">
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="mb-2">
             <h1 className="text-xl font-bold text-gray-900">Agentic AI BI</h1>
-            <NotificationBell />
           </div>
           <p className="text-sm text-gray-600">Business Intelligence Platform</p>
         </div>

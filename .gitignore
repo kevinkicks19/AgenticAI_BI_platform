@@ -70,4 +70,23 @@ dev-debug.log
 # tasks/
 
 # Cursor MCP config (contains API keys)
-.cursor/mcp.json 
+.cursor/mcp.json
+**/.cursor/mcp.json
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+backend/sessions.db
+**/sessions.db
+
+# Upload directories
+backend/uploads/
+**/uploads/
+uploads/
+
+# Environment files (additional patterns)
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example 
